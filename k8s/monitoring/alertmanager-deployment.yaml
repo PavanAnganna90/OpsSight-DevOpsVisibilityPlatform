@@ -1,0 +1,133 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: server
+    app.kubernetes.io/part-of: monitoring-stack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: alertmanager
+        app.kubernetes.io/component: server
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9093"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
+      containers:
+        - name: alertmanager
+          image: prom/alertmanager:v0.26.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - '--config.file=/etc/alertmanager/alertmanager.yml'
+            - '--storage.path=/alertmanager'
+            - '--data.retention=120h'
+            - '--web.external-url=http://localhost:9093'
+            - '--log.level=info'
+          ports:
+            - name: http
+              containerPort: 9093
+              protocol: TCP
+          env:
+            - name: TZ
+              value: "UTC"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+              - ALL
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: 500m
+              memory: 1Gi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alertmanager
+              readOnly: true
+            - name: storage
+              mountPath: /alertmanager
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: alertmanager-config
+        - name: storage
+          persistentVolumeClaim:
+            claimName: alertmanager-storage
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: server
+    app.kubernetes.io/part-of: monitoring-stack
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9093"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9093
+      targetPort: 9093
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: server
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: alertmanager-storage
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: server
+    app.kubernetes.io/part-of: monitoring-stack
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: gp3 

@@ -1,0 +1,105 @@
+config:
+  target: 'http://localhost:8000'
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: "Warm up"
+    - duration: 120
+      arrivalRate: 20
+      name: "Ramp up load"
+    - duration: 300
+      arrivalRate: 50
+      name: "Sustained load"
+    - duration: 60
+      arrivalRate: 5
+      name: "Cool down"
+  
+  defaults:
+    headers:
+      Content-Type: 'application/json'
+      User-Agent: 'Artillery Load Test'
+
+  processor: "./load-test-processor.js"
+
+scenarios:
+  - name: "Health Check"
+    weight: 20
+    flow:
+      - get:
+          url: "/health"
+          expect:
+            - statusCode: 200
+
+  - name: "API Health Check"
+    weight: 15
+    flow:
+      - get:
+          url: "/api/v1/health"
+          expect:
+            - statusCode: 200
+
+  - name: "Authentication Flow"
+    weight: 25
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            email: "{{ $randomEmail() }}"
+            password: "testpassword123"
+          capture:
+            - json: "$.access_token"
+              as: "access_token"
+      - get:
+          url: "/api/v1/users/me"
+          headers:
+            Authorization: "Bearer {{ access_token }}"
+          expect:
+            - statusCode: [200, 401]
+
+  - name: "Dashboard Data"
+    weight: 20
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            email: "admin@example.com"
+            password: "admin123"
+          capture:
+            - json: "$.access_token"
+              as: "access_token"
+      - get:
+          url: "/api/v1/teams"
+          headers:
+            Authorization: "Bearer {{ access_token }}"
+          expect:
+            - statusCode: [200, 401]
+      - get:
+          url: "/api/v1/projects"
+          headers:
+            Authorization: "Bearer {{ access_token }}"
+          expect:
+            - statusCode: [200, 401]
+
+  - name: "Metrics and Monitoring"
+    weight: 10
+    flow:
+      - get:
+          url: "/cache/metrics"
+          expect:
+            - statusCode: 200
+      - get:
+          url: "/api/performance"
+          expect:
+            - statusCode: 200
+
+  - name: "Static Assets"
+    weight: 10
+    flow:
+      - get:
+          url: "/docs"
+          expect:
+            - statusCode: [200, 404]
+      - get:
+          url: "/redoc"
+          expect:
+            - statusCode: [200, 404]

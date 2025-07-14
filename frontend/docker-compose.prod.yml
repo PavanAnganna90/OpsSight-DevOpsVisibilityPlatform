@@ -1,0 +1,116 @@
+# OpsSight Docker Compose Production Override
+# Use: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
+
+version: '3.8'
+
+services:
+  opssight-frontend:
+    build:
+      target: runner
+      args:
+        - NODE_ENV=production
+        - NEXT_PUBLIC_APP_NAME=OpsSight
+        - NEXT_PUBLIC_APP_VERSION=1.0.0
+        - NEXT_PUBLIC_APP_ENV=production
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_APP_ENV=production
+    env_file:
+      - .env.production
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: stop-first
+        failure_action: rollback
+      rollback_config:
+        parallelism: 1
+        delay: 10s
+
+  postgres:
+    environment:
+      - POSTGRES_DB=opssight_production
+      - POSTGRES_USER=opssight_prod_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  redis:
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  nginx:
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+
+  prometheus:
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  grafana:
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  loki:
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  promtail:
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.1' 

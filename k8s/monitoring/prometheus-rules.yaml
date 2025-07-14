@@ -1,0 +1,131 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/component: rules
+    app.kubernetes.io/part-of: monitoring-stack
+data:
+  application-alerts.yml: |
+    groups:
+      - name: opsight-application
+        interval: 30s
+        rules:
+          # Backend API alerts
+          - alert: BackendDown
+            expr: up{job="opsight-backend"} == 0
+            for: 1m
+            labels:
+              severity: critical
+              service: backend
+            annotations:
+              summary: "OpsSight Backend API is down"
+              description: "Backend API instance {{ $labels.instance }} has been down for more than 1 minute"
+              runbook_url: "https://docs.opsight.local/runbooks/backend-down"
+
+          - alert: BackendHighErrorRate
+            expr: rate(http_requests_total{job="opsight-backend",status=~"5.."}[5m]) / rate(http_requests_total{job="opsight-backend"}[5m]) > 0.1
+            for: 5m
+            labels:
+              severity: warning
+              service: backend
+            annotations:
+              summary: "High error rate in backend API"
+              description: "Backend API error rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+              runbook_url: "https://docs.opsight.local/runbooks/high-error-rate"
+
+          - alert: BackendHighLatency
+            expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="opsight-backend"}[5m])) > 2
+            for: 10m
+            labels:
+              severity: warning
+              service: backend
+            annotations:
+              summary: "High latency in backend API"
+              description: "95th percentile latency is {{ $value }}s for backend API"
+              runbook_url: "https://docs.opsight.local/runbooks/high-latency"
+
+          - alert: FrontendDown
+            expr: up{job="opsight-frontend"} == 0
+            for: 2m
+            labels:
+              severity: critical
+              service: frontend
+            annotations:
+              summary: "OpsSight Frontend is down"
+              description: "Frontend instance {{ $labels.instance }} has been down for more than 2 minutes"
+              runbook_url: "https://docs.opsight.local/runbooks/frontend-down"
+
+          - alert: DatabaseConnectionPoolExhausted
+            expr: database_connections_active{job="opsight-backend"} / database_connections_max{job="opsight-backend"} > 0.9
+            for: 5m
+            labels:
+              severity: critical
+              service: database
+            annotations:
+              summary: "Database connection pool nearly exhausted"
+              description: "Database connection pool usage is {{ $value | humanizePercentage }}"
+              runbook_url: "https://docs.opsight.local/runbooks/db-connections"
+
+  infrastructure-alerts.yml: |
+    groups:
+      - name: kubernetes-infrastructure
+        interval: 30s
+        rules:
+          # Node-level alerts
+          - alert: NodeDown
+            expr: up{job="kubernetes-nodes"} == 0
+            for: 5m
+            labels:
+              severity: critical
+              component: node
+            annotations:
+              summary: "Kubernetes node is down"
+              description: "Node {{ $labels.instance }} has been down for more than 5 minutes"
+              runbook_url: "https://docs.opsight.local/runbooks/node-down"
+
+          - alert: NodeHighCPUUsage
+            expr: (1 - rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100 > 80
+            for: 10m
+            labels:
+              severity: warning
+              component: node
+            annotations:
+              summary: "High CPU usage on node"
+              description: "CPU usage is {{ $value }}% on node {{ $labels.instance }}"
+              runbook_url: "https://docs.opsight.local/runbooks/high-cpu"
+
+          - alert: NodeHighMemoryUsage
+            expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+            for: 10m
+            labels:
+              severity: warning
+              component: node
+            annotations:
+              summary: "High memory usage on node"
+              description: "Memory usage is {{ $value }}% on node {{ $labels.instance }}"
+              runbook_url: "https://docs.opsight.local/runbooks/high-memory"
+
+          - alert: PodCrashLooping
+            expr: rate(kube_pod_container_status_restarts_total[5m]) * 60 * 5 > 0
+            for: 5m
+            labels:
+              severity: warning
+              component: pod
+            annotations:
+              summary: "Pod is crash looping"
+              description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is restarting {{ $value }} times per 5 minutes"
+              runbook_url: "https://docs.opsight.local/runbooks/crash-loop"
+
+          - alert: KubernetesAPIServerDown
+            expr: up{job="kubernetes-apiservers"} == 0
+            for: 5m
+            labels:
+              severity: critical
+              component: apiserver
+            annotations:
+              summary: "Kubernetes API server is down"
+              description: "Kubernetes API server has been down for more than 5 minutes"
+              runbook_url: "https://docs.opsight.local/runbooks/apiserver-down" 

@@ -1,0 +1,217 @@
+version: '3.8'
+
+services:
+  # Data Infrastructure
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: opssight_ml
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # MLflow Services
+  mlflow-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: mlflow
+      POSTGRES_USER: mlflow
+      POSTGRES_PASSWORD: mlflow
+    volumes:
+      - mlflow_db_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  mlflow-server:
+    image: python:3.11-slim
+    depends_on:
+      - mlflow-db
+      - minio
+    environment:
+      MLFLOW_BACKEND_STORE_URI: postgresql://mlflow:mlflow@mlflow-db:5432/mlflow
+      MLFLOW_DEFAULT_ARTIFACT_ROOT: s3://mlflow-artifacts/
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./requirements.txt:/requirements.txt
+    command: >
+      bash -c "
+        pip install mlflow[extras] psycopg2-binary boto3 &&
+        mlflow server 
+          --backend-store-uri postgresql://mlflow:mlflow@mlflow-db:5432/mlflow
+          --default-artifact-root s3://mlflow-artifacts/
+          --host 0.0.0.0
+          --port 5000
+      "
+
+  # ML Services
+  kafka-consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile.consumer
+    depends_on:
+      - kafka
+      - postgres
+      - redis
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: opssight_ml
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config
+    restart: unless-stopped
+
+  model-training:
+    build:
+      context: .
+      dockerfile: Dockerfile.training
+    depends_on:
+      - postgres
+      - redis
+      - mlflow-server
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: opssight_ml
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MLFLOW_TRACKING_URI: http://mlflow-server:5000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config
+      - ./data:/app/data
+    command: python -m src.training.training_pipeline
+
+  inference-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.inference
+    depends_on:
+      - postgres
+      - redis
+      - mlflow-server
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: opssight_ml
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MLFLOW_TRACKING_URI: http://mlflow-server:5000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      INFERENCE_HOST: 0.0.0.0
+      INFERENCE_PORT: 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config
+    command: python -m src.inference.inference_api
+
+  # Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+
+volumes:
+  zookeeper_data:
+  zookeeper_logs:
+  kafka_data:
+  redis_data:
+  postgres_data:
+  mlflow_db_data:
+  minio_data:
+  prometheus_data:
+  grafana_data:

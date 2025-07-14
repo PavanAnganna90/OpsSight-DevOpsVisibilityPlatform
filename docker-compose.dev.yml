@@ -1,0 +1,410 @@
+# OpsSight DevOps Platform - Development Environment
+# Optimized for local development with hot reload and debugging
+
+version: '3.8'
+
+networks:
+  opssight-dev:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+  minio_dev_data:
+    driver: local
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: opssight-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: opssight_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./backend/scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - opssight-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d opssight_dev"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    command: >
+      postgres
+      -c log_statement=all
+      -c log_duration=on
+      -c log_line_prefix='%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: opssight-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+      - ./backend/config/redis-dev.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - opssight-dev
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    command: redis-server /usr/local/etc/redis/redis.conf
+
+  # MinIO Object Storage (S3 Compatible)
+  minio:
+    image: minio/minio:latest
+    container_name: opssight-minio-dev
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+      MINIO_CONSOLE_ADDRESS: ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_dev_data:/data
+    networks:
+      - opssight-dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    command: server /data
+
+  # Backend API (Development)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+      target: development
+    container_name: opssight-backend-dev
+    restart: unless-stopped
+    environment:
+      # Database Configuration
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/opssight_dev
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: opssight_dev
+      
+      # Redis Configuration
+      REDIS_URL: redis://redis:6379/0
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      
+      # Application Configuration
+      ENVIRONMENT: development
+      DEBUG: true
+      LOG_LEVEL: DEBUG
+      API_V1_STR: /api/v1
+      
+      # Security Configuration (Development)
+      SECRET_KEY: dev-secret-key-not-for-production
+      JWT_SECRET_KEY: dev-jwt-secret-key-not-for-production
+      ENCRYPTION_KEY: ZGV2LWVuY3J5cHRpb24ta2V5LW5vdC1mb3ItcHJvZHVjdGlvbg==
+      
+      # OAuth Configuration (Development)
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      
+      # External Services
+      FRONTEND_URL: http://localhost:3000
+      BACKEND_URL: http://localhost:8000
+      
+      # MinIO Configuration
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin123
+      MINIO_BUCKET: opssight-dev
+      
+      # Monitoring Configuration
+      PROMETHEUS_ENABLED: true
+      JAEGER_ENABLED: false
+      OPENTELEMETRY_ENABLED: false
+      
+      # Development Features
+      RELOAD: true
+      WORKERS: 1
+      ACCESS_LOG: true
+    ports:
+      - "8000:8000"
+      - "5678:5678"  # Debug port
+    volumes:
+      - ./backend:/app
+      - ./backend/logs:/app/logs
+      - /app/venv  # Exclude venv from bind mount
+    networks:
+      - opssight-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    develop:
+      watch:
+        - action: sync
+          path: ./backend/app
+          target: /app/app
+        - action: rebuild
+          path: ./backend/requirements.txt
+
+  # Frontend Application (Development)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+      target: development
+    container_name: opssight-frontend-dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: 1
+      WATCHPACK_POLLING: true
+      
+      # API Configuration
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+      NEXT_PUBLIC_FRONTEND_URL: http://localhost:3000
+      
+      # OAuth Configuration
+      NEXT_PUBLIC_GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      
+      # Feature Flags
+      NEXT_PUBLIC_MONITORING_ENABLED: true
+      NEXT_PUBLIC_DEBUG_MODE: true
+      
+      # Performance Configuration
+      NEXT_PUBLIC_ENABLE_ANALYTICS: false
+      NEXT_PUBLIC_SENTRY_DSN: ""
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - ./frontend/logs:/app/logs
+      - /app/node_modules  # Exclude node_modules from bind mount
+      - /app/.next         # Exclude .next from bind mount
+    networks:
+      - opssight-dev
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend/src
+          target: /app/src
+        - action: rebuild
+          path: ./frontend/package.json
+
+  # Development Tools Container
+  dev-tools:
+    image: node:18-alpine
+    container_name: opssight-dev-tools
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - opssight-dev
+    command: tail -f /dev/null
+    profiles:
+      - tools
+
+  # Adminer Database Management
+  adminer:
+    image: adminer:latest
+    container_name: opssight-adminer-dev
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: pepa-linha
+    ports:
+      - "8080:8080"
+    networks:
+      - opssight-dev
+    depends_on:
+      - postgres
+    profiles:
+      - tools
+
+  # Redis Commander
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: opssight-redis-commander-dev
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379
+      HTTP_USER: admin
+      HTTP_PASSWORD: admin
+    ports:
+      - "8081:8081"
+    networks:
+      - opssight-dev
+    depends_on:
+      - redis
+    profiles:
+      - tools
+
+  # Mailhog (Email Testing)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: opssight-mailhog-dev
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - opssight-dev
+    profiles:
+      - tools
+
+  # Prometheus (Monitoring)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: opssight-prometheus-dev
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus-dev.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules
+    networks:
+      - opssight-dev
+    profiles:
+      - monitoring
+
+  # Grafana (Visualization)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: opssight-grafana-dev
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_SECRET_KEY: dev-grafana-secret
+      GF_INSTALL_PLUGINS: grafana-piechart-panel,grafana-worldmap-panel
+      GF_SERVER_ROOT_URL: http://localhost:3001
+      GF_AUTH_ANONYMOUS_ENABLED: true
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - opssight-dev
+    depends_on:
+      - prometheus
+    profiles:
+      - monitoring
+
+  # Loki (Log Aggregation)
+  loki:
+    image: grafana/loki:latest
+    container_name: opssight-loki-dev
+    restart: unless-stopped
+    command:
+      - '-config.file=/etc/loki/local-config.yaml'
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki/loki-dev.yml:/etc/loki/local-config.yaml
+    networks:
+      - opssight-dev
+    profiles:
+      - monitoring
+
+  # Promtail (Log Collector)
+  promtail:
+    image: grafana/promtail:latest
+    container_name: opssight-promtail-dev
+    restart: unless-stopped
+    command:
+      - '-config.file=/etc/promtail/config.yml'
+    volumes:
+      - ./monitoring/promtail/promtail-dev.yml:/etc/promtail/config.yml
+      - ./backend/logs:/var/log/backend
+      - ./frontend/logs:/var/log/frontend
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - opssight-dev
+    depends_on:
+      - loki
+    profiles:
+      - monitoring
+
+  # Jaeger (Distributed Tracing)
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: opssight-jaeger-dev
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # Jaeger collector
+      - "14250:14250"  # Jaeger gRPC
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+    networks:
+      - opssight-dev
+    profiles:
+      - monitoring
+
+  # NGINX (Development Proxy)
+  nginx:
+    image: nginx:alpine
+    container_name: opssight-nginx-dev
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/dev.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    networks:
+      - opssight-dev
+    depends_on:
+      - frontend
+      - backend
+    profiles:
+      - proxy

@@ -1,0 +1,403 @@
+name: Pull Request Validation
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  pr-checks:
+    name: PR Validation Checks
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v40
+        with:
+          files: |
+            backend/**/*.py
+            frontend/**/*.{js,jsx,ts,tsx}
+            mobile/**/*.{js,jsx,ts,tsx}
+            **/*.yml
+            **/*.yaml
+            **/*.json
+            helm/**/*
+            k8s/**/*
+            infrastructure/**/*
+
+      - name: Check PR title format
+        run: |
+          title="${{ github.event.pull_request.title }}"
+          if [[ ! "$title" =~ ^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?: .+ ]]; then
+            echo "❌ PR title must follow conventional commit format: type(scope): description"
+            echo "Examples: feat: add user authentication, fix(api): resolve timeout issue"
+            exit 1
+          fi
+          echo "✅ PR title format is valid"
+
+      - name: Check PR description
+        run: |
+          body="${{ github.event.pull_request.body }}"
+          if [[ ${#body} -lt 20 ]]; then
+            echo "❌ PR description must be at least 20 characters"
+            exit 1
+          fi
+          echo "✅ PR description is adequate"
+
+      - name: Check for breaking changes
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          echo "Files changed: ${{ steps.changed-files.outputs.all_changed_files }}"
+          
+          # Check for potential breaking changes
+          if echo "${{ steps.changed-files.outputs.all_changed_files }}" | grep -E "(api|schema|models)" > /dev/null; then
+            echo "⚠️  Potential breaking changes detected - ensure backward compatibility"
+          fi
+
+  lint-check:
+    name: Lint Check
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          npm install
+          cd frontend && npm install
+          cd ../backend && pip install -r requirements.txt
+
+      - name: Run linting
+        run: |
+          npm run lint:frontend
+          npm run lint:backend
+
+  security-check:
+    name: Security Check
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run security scan
+        uses: securecodewarrior/github-action-add-sarif@v1
+        with:
+          sarif-file: 'security-scan-results.sarif'
+
+      - name: Check for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  test-changes:
+    name: Test Changed Code
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          npm install
+          cd frontend && npm install
+          cd ../backend && pip install -r requirements.txt
+
+      - name: Run backend tests
+        run: |
+          cd backend
+          pytest --cov=. --cov-report=xml
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379
+          SECRET_KEY: test_secret_key
+          ENVIRONMENT: testing
+
+      - name: Run frontend tests
+        run: |
+          cd frontend
+          npm test -- --coverage --watchAll=false
+
+  build-check:
+    name: Build Check
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: test-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          tags: test-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  performance-impact:
+    name: Performance Impact Analysis
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          cd frontend && npm install
+
+      - name: Build frontend
+        run: |
+          cd frontend && npm run build
+
+      - name: Analyze bundle size
+        uses: preactjs/compressed-size-action@v2
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          pattern: "./frontend/.next/static/**/*.js"
+          exclude: "{**/*.map,**/node_modules/**}"
+
+  deployment-check:
+    name: Deployment Configuration Check
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Kubernetes manifests
+        run: |
+          # Install kubeval for Kubernetes manifest validation
+          curl -L https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz | tar xz
+          sudo mv kubeval /usr/local/bin
+          
+          # Validate all Kubernetes manifests
+          find k8s/ -name "*.yaml" -exec kubeval {} \;
+
+      - name: Validate Helm charts
+        run: |
+          # Install Helm
+          curl https://get.helm.sh/helm-v3.12.0-linux-amd64.tar.gz | tar xz
+          sudo mv linux-amd64/helm /usr/local/bin
+          
+          # Lint Helm charts
+          helm lint helm/opssight/
+
+      - name: Validate Terraform configuration
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform validation
+        run: |
+          cd infrastructure
+          terraform init -backend=false
+          terraform validate
+          terraform fmt -check
+
+  pr-summary:
+    name: PR Summary
+    runs-on: ubuntu-latest
+    needs: [pr-checks, lint-check, security-check, test-changes, build-check, performance-impact, deployment-check]
+    if: always() && github.event.pull_request.draft == false
+    
+    steps:
+      - name: Update PR with results
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const results = {
+              'PR Checks': '${{ needs.pr-checks.result }}',
+              'Lint Check': '${{ needs.lint-check.result }}',
+              'Security Check': '${{ needs.security-check.result }}',
+              'Test Changes': '${{ needs.test-changes.result }}',
+              'Build Check': '${{ needs.build-check.result }}',
+              'Performance Impact': '${{ needs.performance-impact.result }}',
+              'Deployment Check': '${{ needs.deployment-check.result }}'
+            };
+            
+            let summary = '## 🔍 PR Validation Summary\n\n';
+            let allPassed = true;
+            
+            for (const [check, result] of Object.entries(results)) {
+              const emoji = result === 'success' ? '✅' : result === 'failure' ? '❌' : '⚠️';
+              summary += `${emoji} **${check}**: ${result}\n`;
+              if (result !== 'success') allPassed = false;
+            }
+            
+            if (allPassed) {
+              summary += '\n🎉 **All checks passed!** This PR is ready for review.';
+            } else {
+              summary += '\n⚠️ **Some checks failed.** Please review and fix the issues above.';
+            }
+            
+            // Find existing comment or create new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && comment.body.includes('PR Validation Summary')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: summary
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: summary
+              });
+            }
+
+  auto-assign-reviewers:
+    name: Auto-assign Reviewers
+    runs-on: ubuntu-latest
+    if: github.event.action == 'opened'
+    
+    steps:
+      - name: Auto-assign reviewers based on files changed
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const changedFiles = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            
+            const files = changedFiles.data.map(file => file.filename);
+            let reviewers = [];
+            
+            // Backend changes - assign backend team
+            if (files.some(file => file.startsWith('backend/'))) {
+              reviewers.push('backend-team-lead');
+            }
+            
+            // Frontend changes - assign frontend team
+            if (files.some(file => file.startsWith('frontend/'))) {
+              reviewers.push('frontend-team-lead');
+            }
+            
+            // Infrastructure changes - assign DevOps team
+            if (files.some(file => file.startsWith('infrastructure/') || file.startsWith('k8s/') || file.startsWith('helm/'))) {
+              reviewers.push('devops-team-lead');
+            }
+            
+            // Security-related changes - assign security team
+            if (files.some(file => file.includes('security') || file.includes('auth'))) {
+              reviewers.push('security-team-lead');
+            }
+            
+            if (reviewers.length > 0) {
+              await github.rest.pulls.requestReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                reviewers: [...new Set(reviewers)] // Remove duplicates
+              });
+            }

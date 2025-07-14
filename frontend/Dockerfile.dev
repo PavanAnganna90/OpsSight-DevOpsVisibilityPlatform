@@ -1,0 +1,63 @@
+# OpsSight Frontend - Development Dockerfile
+# Multi-stage build for development with hot reload and debugging
+
+FROM node:18-alpine as base
+
+# Set environment variables
+ENV NODE_ENV=development \
+    NEXT_TELEMETRY_DISABLED=1 \
+    WATCHPACK_POLLING=true
+
+# Install system dependencies
+RUN apk add --no-cache \
+    git \
+    curl \
+    bash
+
+# Create app user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nextjs -u 1001
+
+# Set work directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Development stage
+FROM base as development
+
+# Install development tools globally
+RUN npm install -g \
+    @storybook/cli \
+    eslint \
+    typescript \
+    @types/node
+
+# Copy application code
+COPY . .
+
+# Create logs directory
+RUN mkdir -p logs && chown -R nextjs:nodejs logs
+
+# Create .next directory and set permissions
+RUN mkdir -p .next && chown -R nextjs:nodejs .next
+
+# Change ownership of app directory
+RUN chown -R nextjs:nodejs /app
+
+# Switch to app user
+USER nextjs
+
+# Expose ports
+EXPOSE 3000 6006
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:3000/api/health || exit 1
+
+# Development command with hot reload
+CMD ["npm", "run", "dev"]

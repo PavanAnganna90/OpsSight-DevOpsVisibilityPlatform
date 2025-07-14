@@ -1,0 +1,127 @@
+# Production environment values for opsight
+# Reason: High-availability and performance optimized configuration for production
+
+# Application settings
+app:
+  environment: production
+
+# Frontend configuration - production-ready with high availability
+frontend:
+  replicaCount: 3
+  image:
+    tag: "latest"
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 15
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 70
+  env:
+    NODE_ENV: production
+    NEXT_PUBLIC_API_URL: https://api.opsight.com
+
+# Backend configuration - production-ready with high availability
+backend:
+  replicaCount: 5
+  image:
+    tag: "latest"
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 3Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 5
+    maxReplicas: 25
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 70
+  env:
+    ENVIRONMENT: production
+    WORKERS: 8
+
+# Database configuration - production-ready with higher resources
+postgresql:
+  primary:
+    persistence:
+      size: 100Gi
+      storageClass: gp3
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+
+# Ingress configuration for production
+ingress:
+  annotations:
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-west-2:ACCOUNT:certificate/CERT-ID
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS-1-2-2017-01
+  hosts:
+    - host: opsight.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: backend
+  tls:
+    - secretName: opsight-production-tls
+      hosts:
+        - opsight.com
+
+# Monitoring configuration - production-ready with extended retention
+monitoring:
+  prometheus:
+    server:
+      retention: "30d"
+      resources:
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+  grafana:
+    adminPassword: "" # Use external secret
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 200m
+        memory: 256Mi
+  alertmanager:
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+# Production affinity rules for high availability
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - opsight
+        topologyKey: kubernetes.io/hostname 

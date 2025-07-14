@@ -1,0 +1,391 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.2.3)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+  deployments: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  validate-release:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-prerelease: ${{ steps.version.outputs.prerelease }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Check if this is a prerelease (contains alpha, beta, rc)
+          if [[ "$VERSION" =~ (alpha|beta|rc) ]]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "Release version: $VERSION"
+
+      - name: Validate version format
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[0-9]+)?)?$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "Expected format: v1.2.3 or v1.2.3-alpha.1"
+            exit 1
+          fi
+          echo "✅ Version format is valid"
+
+      - name: Check if tag already exists
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if git tag -l | grep -q "^$VERSION$"; then
+            echo "❌ Tag $VERSION already exists"
+            exit 1
+          fi
+          echo "✅ Tag is available"
+
+      - name: Validate changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ ! -f "CHANGELOG.md" ]]; then
+            echo "⚠️  No CHANGELOG.md found - will generate basic release notes"
+          elif ! grep -q "$VERSION" CHANGELOG.md; then
+            echo "⚠️  Version $VERSION not found in CHANGELOG.md"
+          else
+            echo "✅ Changelog contains release information"
+          fi
+
+  build-and-push:
+    name: Build and Push Release Images
+    runs-on: ubuntu-latest
+    needs: [validate-release]
+    
+    strategy:
+      matrix:
+        component: [backend, frontend]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.component }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.validate-release.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.validate-release.outputs.version }}
+            type=semver,pattern={{major}},value=${{ needs.validate-release.outputs.version }}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.component }}
+          file: ./${{ matrix.component }}/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ needs.validate-release.outputs.version }}
+            BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-and-push]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create tag if manual release
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$VERSION" -m "Release $VERSION"
+          git push origin "$VERSION"
+
+      - name: Generate release notes
+        id: release-notes
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          
+          # Try to extract from CHANGELOG.md
+          if [[ -f "CHANGELOG.md" ]] && grep -q "$VERSION" CHANGELOG.md; then
+            # Extract section for this version from CHANGELOG
+            NOTES=$(awk "/^## \[$VERSION\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md)
+          else
+            # Generate release notes from commits since last tag
+            LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+            if [[ -n "$LAST_TAG" ]]; then
+              NOTES=$(git log --pretty=format:"- %s" $LAST_TAG..HEAD)
+            else
+              NOTES="Initial release of OpsSight DevOps Platform"
+            fi
+          fi
+          
+          # Add deployment information
+          FULL_NOTES="## 🚀 What's New
+          
+          $NOTES
+          
+          ## 📋 Deployment Information
+          
+          ### Docker Images
+          - **Backend**: \`ghcr.io/${{ github.repository }}/backend:$VERSION\`
+          - **Frontend**: \`ghcr.io/${{ github.repository }}/frontend:$VERSION\`
+          
+          ### Kubernetes Deployment
+          \`\`\`bash
+          helm upgrade --install opssight ./helm/opssight \\
+            --set image.tag=$VERSION \\
+            --namespace production
+          \`\`\`
+          
+          ### Database Migrations
+          Run database migrations before deploying:
+          \`\`\`bash
+          kubectl exec -it deployment/opssight-backend -- python -m alembic upgrade head
+          \`\`\`
+          
+          ## 🔗 Links
+          - [API Documentation](https://api.opssight.dev/docs)
+          - [Deployment Guide](https://github.com/${{ github.repository }}/blob/$VERSION/docs/deployment_operations_guide.md)
+          - [Security Guide](https://github.com/${{ github.repository }}/blob/$VERSION/backend/docs/security_implementation_guide.md)
+          
+          ## 📊 Metrics
+          - Platform Version: $VERSION
+          - Backend Image Size: ~200MB
+          - Frontend Image Size: ~50MB
+          - Total APIs: 50+
+          - Database Schema Version: $(cat backend/alembic/versions/*.py | wc -l)
+          "
+          
+          # Save to file for GitHub CLI
+          echo "$FULL_NOTES" > release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.validate-release.outputs.version }}
+          name: "Release ${{ needs.validate-release.outputs.version }}"
+          body_path: release-notes.md
+          prerelease: ${{ needs.validate-release.outputs.is-prerelease == 'true' }}
+          generate_release_notes: true
+          files: |
+            helm/opssight/Chart.yaml
+            docs/deployment_operations_guide.md
+            backend/docs/api_documentation_complete.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-release:
+    name: Deploy Release to Production
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-and-push, create-release]
+    if: needs.validate-release.outputs.is-prerelease == 'false'
+    environment:
+      name: production-release
+      url: https://opssight.dev
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl for EKS
+        run: |
+          aws eks update-kubeconfig --region ${{ vars.AWS_REGION || 'us-east-1' }} --name ${{ vars.EKS_CLUSTER_NAME_PRODUCTION }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: '3.12.0'
+
+      - name: Backup current production state
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          kubectl get deployment opssight-backend -n production -o yaml > backup-backend-$VERSION.yaml
+          kubectl get deployment opssight-frontend -n production -o yaml > backup-frontend-$VERSION.yaml
+          echo "✅ Production state backed up"
+
+      - name: Deploy release to production
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          
+          # Deploy with the specific release version
+          helm upgrade --install opssight-production ./helm/opssight \
+            --namespace production \
+            --create-namespace \
+            --values ./helm/opssight/values-production.yaml \
+            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
+            --set image.tag=$VERSION \
+            --set ingress.hosts[0].host=opssight.dev \
+            --set ingress.hosts[1].host=api.opssight.dev \
+            --wait --timeout=20m
+          
+          echo "✅ Release $VERSION deployed to production"
+
+      - name: Verify production deployment
+        run: |
+          kubectl get pods -n production
+          kubectl rollout status deployment/opssight-backend -n production --timeout=600s
+          kubectl rollout status deployment/opssight-frontend -n production --timeout=600s
+
+      - name: Run post-deployment health checks
+        run: |
+          sleep 60
+          
+          # Test critical endpoints
+          curl -f https://api.opssight.dev/health || exit 1
+          curl -f https://api.opssight.dev/api/v1/health || exit 1
+          curl -f https://opssight.dev || exit 1
+          
+          echo "✅ All health checks passed"
+
+      - name: Update production status
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          echo "🎉 Production release $VERSION deployed successfully!"
+          
+          # Update status page or monitoring systems here
+          # curl -X POST "https://status.opssight.dev/api/update" \
+          #   -H "Authorization: Bearer ${{ secrets.STATUS_API_TOKEN }}" \
+          #   -d '{"version": "'$VERSION'", "status": "deployed"}'
+
+  notify-release:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [validate-release, create-release, deploy-release]
+    if: always()
+    
+    steps:
+      - name: Send Slack notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ needs.deploy-release.result || 'success' }}
+          channel: '#releases'
+          text: |
+            🚀 **OpsSight Platform Release ${{ needs.validate-release.outputs.version }}**
+            
+            📋 **Release Details:**
+            • Version: `${{ needs.validate-release.outputs.version }}`
+            • Type: ${{ needs.validate-release.outputs.is-prerelease == 'true' && 'Pre-release' || 'Stable Release' }}
+            • Deployment: ${{ needs.deploy-release.result == 'success' && '✅ Deployed to Production' || '⚠️ Not Deployed' }}
+            
+            🔗 **Links:**
+            • [Release Notes](https://github.com/${{ github.repository }}/releases/tag/${{ needs.validate-release.outputs.version }})
+            • [Production](https://opssight.dev)
+            • [API Documentation](https://api.opssight.dev/docs)
+            
+            🐳 **Docker Images:**
+            • Backend: `ghcr.io/${{ github.repository }}/backend:${{ needs.validate-release.outputs.version }}`
+            • Frontend: `ghcr.io/${{ github.repository }}/frontend:${{ needs.validate-release.outputs.version }}`
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Send email notification
+        if: needs.validate-release.outputs.is-prerelease == 'false'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "OpsSight Platform Release ${{ needs.validate-release.outputs.version }} Deployed"
+          body: |
+            OpsSight Platform version ${{ needs.validate-release.outputs.version }} has been successfully released and deployed to production.
+            
+            Release Notes: https://github.com/${{ github.repository }}/releases/tag/${{ needs.validate-release.outputs.version }}
+            Production URL: https://opssight.dev
+            
+            Thank you,
+            OpsSight DevOps Team
+          to: team@opssight.dev
+          from: noreply@opssight.dev
+
+  cleanup:
+    name: Cleanup Old Resources
+    runs-on: ubuntu-latest
+    needs: [deploy-release]
+    if: needs.deploy-release.result == 'success'
+    
+    steps:
+      - name: Cleanup old Docker images
+        run: |
+          # Keep last 10 versions of each component
+          echo "Cleaning up old Docker images (keeping last 10 versions)"
+          
+          # This would be implemented to clean up old images from the registry
+          # Example with GitHub Container Registry API
+          # curl -X DELETE "https://api.github.com/user/packages/container/opssight-backend/versions/OLD_VERSION_ID" \
+          #   -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Archive deployment artifacts
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          echo "Archiving deployment artifacts for release $VERSION"
+          
+          # Archive logs, configurations, and deployment state
+          # This could involve uploading to S3, backing up to storage, etc.

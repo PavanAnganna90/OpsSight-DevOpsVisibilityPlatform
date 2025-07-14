@@ -1,0 +1,303 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: database-migration
+  labels:
+    app: opssight
+    component: migration
+spec:
+  # Run every day at 2 AM UTC (off-peak hours)
+  schedule: "0 2 * * *"
+  # Keep last 3 successful jobs and 1 failed job for debugging
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  # Don't start new job if previous one is still running
+  concurrencyPolicy: Forbid
+  # Allow 10 minutes for migration to complete before timing out
+  activeDeadlineSeconds: 600
+  
+  jobTemplate:
+    spec:
+      # Don't retry failed migrations automatically - manual intervention required
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app: opssight
+            component: migration
+            job-type: database-migration
+        spec:
+          restartPolicy: Never
+          serviceAccountName: opssight-migration
+          
+          # Use init container to check database connectivity
+          initContainers:
+          - name: wait-for-database
+            image: postgres:15-alpine
+            command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for database to be ready..."
+              until pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USER; do
+                echo "Database not ready, waiting..."
+                sleep 5
+              done
+              echo "Database is ready!"
+            env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: opssight-secrets
+                  key: db-host
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: opssight-secrets
+                  key: db-user
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: opssight-secrets
+                  key: db-password
+          
+          containers:
+          - name: migration
+            image: ghcr.io/opssight/backend:latest
+            imagePullPolicy: Always
+            
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              
+              echo "=== OpsSight Database Migration Job ==="
+              echo "Started at: $(date)"
+              echo "Migration version: $(python -c "import alembic.config; print(alembic.config.Config().get_main_option('version'))" 2>/dev/null || echo 'unknown')"
+              
+              # Create backup before migration
+              echo "Creating database backup..."
+              pg_dump "$DATABASE_URL" > /tmp/backup-$(date +%Y%m%d-%H%M%S).sql
+              
+              # Check current migration status
+              echo "Current migration status:"
+              python -m alembic current || echo "No migrations applied yet"
+              
+              # Show pending migrations
+              echo "Pending migrations:"
+              python -m alembic heads
+              
+              # Run migrations
+              echo "Running database migrations..."
+              python -m alembic upgrade head
+              
+              # Verify migration success
+              echo "Migration completed. Current status:"
+              python -m alembic current
+              
+              # Run post-migration checks
+              echo "Running post-migration health checks..."
+              python -c "
+              from app.db.database import get_db
+              from app.core.config import settings
+              import asyncio
+              
+              async def check_db():
+                  async for db in get_db():
+                      result = await db.execute('SELECT 1')
+                      print('Database connectivity: OK')
+                      
+                      # Check critical tables exist
+                      tables = ['users', 'teams', 'projects', 'roles']
+                      for table in tables:
+                          result = await db.execute(f'SELECT count(*) FROM {table}')
+                          count = result.scalar()
+                          print(f'Table {table}: {count} records')
+                      break
+              
+              asyncio.run(check_db())
+              "
+              
+              echo "=== Migration job completed successfully at $(date) ==="
+            
+            env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: opssight-secrets
+                  key: database-url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: opssight-secrets
+                  key: redis-url
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: opssight-secrets
+                  key: secret-key
+            - name: ENVIRONMENT
+              value: "production"
+            - name: PYTHONPATH
+              value: "/app"
+            
+            # Resource limits for migration job
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "250m"
+              limits:
+                memory: "1Gi"
+                cpu: "500m"
+            
+            # Security context
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1000
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                - ALL
+              readOnlyRootFilesystem: false
+            
+            # Health check during migration
+            livenessProbe:
+              exec:
+                command:
+                - /bin/bash
+                - -c
+                - "ps aux | grep -v grep | grep -q 'alembic upgrade' || exit 0"
+              initialDelaySeconds: 30
+              periodSeconds: 30
+              timeoutSeconds: 10
+              failureThreshold: 20
+          
+          # Tolerate temporary node issues
+          tolerations:
+          - key: "node.kubernetes.io/not-ready"
+            operator: "Exists"
+            effect: "NoExecute"
+            tolerationSeconds: 300
+          - key: "node.kubernetes.io/unreachable"
+            operator: "Exists"
+            effect: "NoExecute"
+            tolerationSeconds: 300
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: opssight-migration
+  labels:
+    app: opssight
+    component: migration
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: opssight-migration
+  labels:
+    app: opssight
+    component: migration
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "create"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: opssight-migration
+  labels:
+    app: opssight
+    component: migration
+subjects:
+- kind: ServiceAccount
+  name: opssight-migration
+  namespace: default
+roleRef:
+  kind: Role
+  name: opssight-migration
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: manual-migration-template
+  labels:
+    app: opssight
+    component: migration
+    type: manual
+spec:
+  # This is a template for manual migrations triggered during deployments
+  # It should be copied and modified with appropriate image tags
+  template:
+    metadata:
+      labels:
+        app: opssight
+        component: migration
+        job-type: manual-migration
+    spec:
+      restartPolicy: Never
+      serviceAccountName: opssight-migration
+      
+      containers:
+      - name: migration
+        image: ghcr.io/opssight/backend:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "=== Manual Migration Job ==="
+          echo "Image: $IMAGE_TAG"
+          echo "Started at: $(date)"
+          
+          # Show current status
+          echo "Current migration status:"
+          python -m alembic current
+          
+          # Show what migrations will be applied
+          echo "Migrations to be applied:"
+          python -m alembic show head
+          
+          # Run migrations
+          echo "Running migrations..."
+          python -m alembic upgrade head
+          
+          echo "Migration completed at $(date)"
+        
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: opssight-secrets
+              key: database-url
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: opssight-secrets
+              key: secret-key
+        - name: ENVIRONMENT
+          value: "production"
+        - name: IMAGE_TAG
+          value: "latest"  # This should be overridden during deployment
+        
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "250m"

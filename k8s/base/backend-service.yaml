@@ -1,0 +1,269 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: opssight-backend
+  namespace: opssight
+  labels:
+    app.kubernetes.io/name: opssight
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: opsight-platform
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8000
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: opssight
+    app.kubernetes.io/component: backend
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: opssight-backend
+  namespace: opssight
+  labels:
+    app.kubernetes.io/name: opssight
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: opsight-platform
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/opssight-backend-role
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: opssight-backend
+  namespace: opssight
+  labels:
+    app.kubernetes.io/name: opssight
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: opsight-platform
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: opssight-backend
+  namespace: opssight
+  labels:
+    app.kubernetes.io/name: opssight
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: opsight-platform
+subjects:
+- kind: ServiceAccount
+  name: opssight-backend
+  namespace: opssight
+roleRef:
+  kind: Role
+  name: opssight-backend
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: opssight-backend-hpa
+  namespace: opssight
+  labels:
+    app.kubernetes.io/name: opssight
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: opsight-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: opssight-backend
+  minReplicas: 3
+  maxReplicas: 15
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: opssight-backend-pdb
+  namespace: opssight
+  labels:
+    app.kubernetes.io/name: opssight
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: opsight-platform
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opssight
+      app.kubernetes.io/component: backend
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opssight-backend-config
+  namespace: opssight
+  labels:
+    app.kubernetes.io/name: opssight
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: opsight-platform
+data:
+  # Application configuration
+  app-config.yaml: |
+    logging:
+      level: INFO
+      format: json
+      handlers:
+        - console
+        - file
+    
+    cache:
+      redis:
+        max_connections: 20
+        retry_on_timeout: true
+        socket_connect_timeout: 5
+        socket_timeout: 5
+      memory:
+        max_size: 1000
+        ttl: 300
+    
+    security:
+      cors:
+        allow_origins: ["https://opssight.dev"]
+        allow_methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+        allow_headers: ["*"]
+        max_age: 86400
+      
+      rate_limiting:
+        default: "100/minute"
+        authenticated: "1000/minute"
+        admin: "unlimited"
+    
+    monitoring:
+      metrics:
+        enabled: true
+        port: 9090
+        path: "/metrics"
+      
+      health_checks:
+        enabled: true
+        interval: 30
+        timeout: 10
+        
+      tracing:
+        enabled: true
+        jaeger_endpoint: "http://jaeger:14268/api/traces"
+        sample_rate: 0.1
+    
+    database:
+      pool_size: 20
+      max_overflow: 30
+      pool_timeout: 30
+      pool_recycle: 3600
+      echo: false
+    
+    performance:
+      worker_timeout: 30
+      keep_alive: 2
+      max_requests: 1000
+      max_requests_jitter: 100
+
+  # Logging configuration
+  logging.conf: |
+    [loggers]
+    keys=root,uvicorn,app
+
+    [handlers]
+    keys=console,file
+
+    [formatters]
+    keys=json,default
+
+    [logger_root]
+    level=INFO
+    handlers=console,file
+
+    [logger_uvicorn]
+    level=INFO
+    handlers=console,file
+    qualname=uvicorn
+    propagate=0
+
+    [logger_app]
+    level=INFO
+    handlers=console,file
+    qualname=app
+    propagate=0
+
+    [handler_console]
+    class=StreamHandler
+    level=INFO
+    formatter=json
+    args=(sys.stdout,)
+
+    [handler_file]
+    class=FileHandler
+    level=INFO
+    formatter=json
+    args=('/app/logs/app.log',)
+
+    [formatter_json]
+    format={"time": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s"}
+
+    [formatter_default]
+    format=%(asctime)s [%(levelname)s] %(name)s: %(message)s

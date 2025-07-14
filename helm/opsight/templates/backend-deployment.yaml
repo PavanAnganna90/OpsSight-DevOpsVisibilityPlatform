@@ -1,0 +1,158 @@
+{{- if .Values.backend.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "opsight.fullname" . }}-backend
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opsight.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  {{- if not .Values.backend.autoscaling.enabled }}
+  replicas: {{ .Values.backend.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "opsight.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/backend-configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/backend-secret.yaml") . | sha256sum }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.backend.service.metricsPort }}"
+        prometheus.io/path: "/metrics"
+      labels:
+        {{- include "opsight.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ .Values.secretsManagement.serviceAccountName | default "secrets-manager-sa" }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: wait-for-db
+          image: postgres:15-alpine
+          command: 
+            - sh
+            - -c
+            - |
+              until pg_isready -h {{ include "opsight.databaseHost" . }} -p {{ include "opsight.databasePort" . }} -U {{ .Values.postgresql.auth.username }}; do
+                echo "Waiting for database to be ready..."
+                sleep 2
+              done
+              echo "Database is ready!"
+      containers:
+        - name: backend
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.global.imageRegistry }}{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.backend.service.targetPort }}
+              protocol: TCP
+            - name: metrics
+              containerPort: {{ .Values.backend.service.metricsPort }}
+              protocol: TCP
+          env:
+            {{- range $key, $value := .Values.backend.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- if .Values.secretsManagement.enabled }}
+            # Secrets from AWS Secrets Manager via CSI Driver
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: opsight-application-secrets
+                  key: JWT_SECRET_KEY
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: opsight-application-secrets
+                  key: SESSION_SECRET
+            - name: GITHUB_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: opsight-application-secrets
+                  key: GITHUB_CLIENT_ID
+            - name: GITHUB_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: opsight-application-secrets
+                  key: GITHUB_CLIENT_SECRET
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: opsight-application-secrets
+                  key: DATABASE_URL
+            {{- else }}
+            # Fallback to traditional secrets
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "opsight.fullname" . }}-backend-secret
+                  key: database-url
+            {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "opsight.fullname" . }}-backend-config
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: metrics
+              mountPath: /tmp/metrics
+            {{- if .Values.secretsManagement.enabled }}
+            - name: secrets-store
+              mountPath: "/mnt/secrets-store"
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: metrics
+          emptyDir: {}
+        {{- if .Values.secretsManagement.enabled }}
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "opsight-application-secrets"
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end -}} 

@@ -1,0 +1,220 @@
+# Default values for opsight
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Global configuration
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+  
+# Application settings
+app:
+  name: opsight
+  version: "1.0.0"
+  environment: staging
+
+# Frontend configuration
+frontend:
+  enabled: true
+  name: frontend
+  image:
+    repository: opsight/frontend
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  replicaCount: 2
+  service:
+    type: ClusterIP
+    port: 3000
+    targetPort: 3000
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  env:
+    NODE_ENV: production
+    NEXT_PUBLIC_APP_VERSION: "1.0.0"
+
+# Backend configuration
+backend:
+  enabled: true
+  name: backend
+  image:
+    repository: opsight/backend
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  replicaCount: 3
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+    metricsPort: 9090
+  resources:
+    limits:
+      cpu: 1500m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 15
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  env:
+    ENVIRONMENT: production
+    WORKERS: 4
+    PROMETHEUS_MULTIPROC_DIR: /tmp/metrics
+    PROMETHEUS_METRICS_PORT: 9090
+
+# Database configuration
+postgresql:
+  enabled: true
+  auth:
+    username: postgres
+    database: opsight
+    existingSecret: opsight-db-secret
+    secretKeys:
+      adminPasswordKey: postgres-password
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: gp3
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+  hosts:
+    - host: opsight.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: backend
+  tls:
+    - secretName: opsight-tls
+      hosts:
+        - opsight.example.com
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+    server:
+      retention: "15d"
+      resources:
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+        requests:
+          cpu: 500m
+          memory: 1Gi
+  grafana:
+    enabled: true
+    adminPassword: admin
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+  alertmanager:
+    enabled: true
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+# ServiceAccount configuration
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# RBAC configuration
+rbac:
+  create: true
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+
+# Security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+    - ALL
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Secrets Management Configuration
+secretsManagement:
+  enabled: true
+  provider: aws
+  serviceAccountName: secrets-manager-sa
+  region: us-west-2
+  secretProviderClasses:
+    application: opsight-application-secrets
+    database: opsight-database-secrets
+    monitoring: opsight-monitoring-secrets
+  awsSecretsManager:
+    applicationSecretsName: "opsight-staging-application-secrets"
+    databaseSecretsName: "opsight-staging-database-secrets"
+    monitoringSecretsName: "opsight-staging-monitoring-secrets"
+    cicdSecretsName: "opsight-staging-cicd-secrets"
+  # Mount path for secrets in pods
+  mountPath: "/mnt/secrets-store"
+  # Automatic secret rotation
+  rotation:
+    enabled: true
+    pollInterval: "2m"
+  # Network policies for secrets access
+  networkPolicies:
+    enabled: false
+  # Annotations for pods using secrets
+  podAnnotations:
+    secrets.opsight.io/access: "true"
+    secrets.opsight.io/provider: "aws" 

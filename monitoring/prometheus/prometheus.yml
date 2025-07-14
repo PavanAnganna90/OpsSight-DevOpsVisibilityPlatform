@@ -1,0 +1,83 @@
+# Global settings for Prometheus
+# Reason: Define core behavior and intervals
+global:
+  scrape_interval: 15s     # How frequently to scrape targets
+  evaluation_interval: 15s  # How frequently to evaluate rules
+  scrape_timeout: 10s      # Timeout for scrape requests
+
+# Scrape configurations
+# Reason: Define what metrics to collect and from where
+scrape_configs:
+  # Backend API metrics
+  # Reason: Monitor application performance and health
+  - job_name: 'backend'
+    metrics_path: '/api/v1/metrics'
+    scrape_interval: 10s  # More frequent for critical service
+    scrape_timeout: 5s    # Shorter timeout for responsiveness
+    scheme: 'http'
+    static_configs:
+      - targets: ['backend:9090']  # Updated to new metrics port
+        labels:
+          service: 'api'
+          environment: 'development'
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'python_gc_.*'
+        action: drop
+      - source_labels: [__name__]
+        regex: 'python_info'
+        action: keep
+      - source_labels: [__name__]
+        regex: 'process_.*'
+        action: keep
+      - source_labels: [__name__]
+        regex: 'http_.*'
+        action: keep
+
+  # Backend process metrics
+  # Reason: Monitor application resource usage
+  - job_name: 'backend-process'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['backend:9090']
+        labels:
+          service: 'api-process'
+          environment: 'development'
+
+  # Prometheus self-monitoring
+  # Reason: Monitor the monitoring system itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Node metrics for host-level monitoring
+  # Reason: Monitor system resources and health
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s  # Less frequent for system metrics
+
+  # Frontend metrics (via Next.js custom metrics)
+  # Reason: Monitor client-side performance
+  - job_name: 'frontend'
+    static_configs:
+      - targets: ['frontend:3000']
+    metrics_path: '/_next/metrics'
+    scheme: 'http'
+
+# Alerting configuration
+# Reason: Define where to send alerts
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - 'alertmanager:9093'
+    # Reason: Ensure alerts are reliable
+    timeout: 10s
+    scheme: 'http'
+
+# Rules configuration
+# Reason: Define alerting and recording rules
+rule_files:
+  - 'rules/*.yml'  # Load all rule files from rules directory 

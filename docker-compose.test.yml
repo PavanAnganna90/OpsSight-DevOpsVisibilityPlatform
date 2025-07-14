@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  # Backend service for testing
+  backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/opssight/backend:latest}
+    container_name: opssight_backend_test
+    environment:
+      - DATABASE_URL=postgresql://postgres:test_password@postgres:5432/opssight_test
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=test-secret-key-for-integration-tests
+      - ENVIRONMENT=test
+      - LOG_LEVEL=INFO
+      - CORS_ORIGINS=["http://localhost:3000"]
+    ports:
+      - "8000:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - opssight-test
+
+  # Frontend service for testing
+  frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/opssight/frontend:latest}
+    container_name: opssight_frontend_test
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NODE_ENV=production
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - opssight-test
+
+  # PostgreSQL database for testing
+  postgres:
+    image: postgres:15-alpine
+    container_name: opssight_postgres_test
+    environment:
+      - POSTGRES_DB=opssight_test
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=test_password
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./backend/scripts/init-test-db.sql:/docker-entrypoint-initdb.d/01-init-test-db.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d opssight_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - opssight-test
+
+  # Redis cache for testing
+  redis:
+    image: redis:7-alpine
+    container_name: opssight_redis_test
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_test_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - opssight-test
+
+  # Nginx reverse proxy for testing
+  nginx:
+    image: nginx:alpine
+    container_name: opssight_nginx_test
+    volumes:
+      - ./nginx/test.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - opssight-test
+
+volumes:
+  postgres_test_data:
+    driver: local
+  redis_test_data:
+    driver: local
+
+networks:
+  opssight-test:
+    driver: bridge
+    name: opssight-test-network 

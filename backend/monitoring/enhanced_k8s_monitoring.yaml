@@ -1,0 +1,306 @@
+# Enhanced Kubernetes Monitoring Configuration
+# Production deployment and monitoring setup for the enhanced Kubernetes monitoring system
+
+# Prometheus Configuration for Enhanced Monitoring
+prometheus:
+  global:
+    scrape_interval: 15s
+    evaluation_interval: 15s
+    external_labels:
+      monitor: 'enhanced-k8s-monitor'
+
+  # Alerting Rules for Enhanced Monitoring
+  rule_files:
+    - "enhanced_k8s_alerts.yml"
+
+  # Scrape Configurations
+  scrape_configs:
+    - job_name: 'enhanced-k8s-api'
+      static_configs:
+        - targets: ['localhost:8000']
+      metrics_path: '/api/v1/kubernetes/enhanced/health'
+      scrape_interval: 30s
+      scrape_timeout: 10s
+
+    - job_name: 'kubernetes-nodes'
+      kubernetes_sd_configs:
+        - role: node
+      relabel_configs:
+        - source_labels: [__address__]
+          regex: '(.*):10250'
+          target_label: __address__
+          replacement: '${1}:9100'
+
+    - job_name: 'kubernetes-pods'
+      kubernetes_sd_configs:
+        - role: pod
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+          action: keep
+          regex: true
+
+# Docker Compose for Enhanced Monitoring Stack
+docker_compose:
+  version: '3.8'
+  services:
+    prometheus:
+      image: prom/prometheus:latest
+      container_name: enhanced-k8s-prometheus
+      ports:
+        - "9090:9090"
+      volumes:
+        - ./prometheus.yml:/etc/prometheus/prometheus.yml
+        - ./enhanced_k8s_alerts.yml:/etc/prometheus/enhanced_k8s_alerts.yml
+        - prometheus_data:/prometheus
+      command:
+        - '--config.file=/etc/prometheus/prometheus.yml'
+        - '--storage.tsdb.path=/prometheus'
+        - '--web.console.libraries=/etc/prometheus/console_libraries'
+        - '--web.console.templates=/etc/prometheus/consoles'
+        - '--storage.tsdb.retention.time=200h'
+        - '--web.enable-lifecycle'
+        - '--web.enable-admin-api'
+
+    grafana:
+      image: grafana/grafana:latest
+      container_name: enhanced-k8s-grafana
+      ports:
+        - "3000:3000"
+      volumes:
+        - grafana_data:/var/lib/grafana
+        - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+        - ./grafana/datasources:/etc/grafana/provisioning/datasources
+      environment:
+        - GF_SECURITY_ADMIN_PASSWORD=admin
+        - GF_USERS_ALLOW_SIGN_UP=false
+
+    redis:
+      image: redis:alpine
+      container_name: enhanced-k8s-redis
+      ports:
+        - "6379:6379"
+      volumes:
+        - redis_data:/data
+      command: redis-server --appendonly yes
+
+  volumes:
+    prometheus_data:
+    grafana_data:
+    redis_data:
+
+# Kubernetes Deployment Configuration
+kubernetes_deployment:
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: enhanced-k8s-monitoring
+    namespace: monitoring
+    labels:
+      app: enhanced-k8s-monitoring
+      version: v1.0.0
+  spec:
+    replicas: 3
+    selector:
+      matchLabels:
+        app: enhanced-k8s-monitoring
+    template:
+      metadata:
+        labels:
+          app: enhanced-k8s-monitoring
+      spec:
+        containers:
+        - name: enhanced-k8s-api
+          image: opssight/enhanced-k8s-monitoring:latest
+          ports:
+          - containerPort: 8000
+          env:
+          - name: PROMETHEUS_ENDPOINT
+            value: "http://prometheus:9090"
+          - name: REDIS_URL
+            value: "redis://redis:6379"
+          - name: LOG_LEVEL
+            value: "INFO"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /api/v1/kubernetes/enhanced/health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/v1/kubernetes/enhanced/health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+# Service Configuration
+kubernetes_service:
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: enhanced-k8s-monitoring-service
+    namespace: monitoring
+    labels:
+      app: enhanced-k8s-monitoring
+  spec:
+    selector:
+      app: enhanced-k8s-monitoring
+    ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+    type: LoadBalancer
+
+# Alert Rules for Enhanced Monitoring
+alert_rules:
+  groups:
+  - name: enhanced_k8s_monitoring
+    rules:
+    - alert: EnhancedK8sServiceDown
+      expr: up{job="enhanced-k8s-api"} == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Enhanced K8s monitoring service is down"
+        description: "Enhanced Kubernetes monitoring service has been down for more than 5 minutes."
+
+    - alert: HighCacheEvictionRate
+      expr: rate(enhanced_k8s_cache_evictions_total[5m]) > 10
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High cache eviction rate detected"
+        description: "Cache eviction rate is {{ $value }} evictions per second, which is above the threshold."
+
+    - alert: LowCacheHitRate
+      expr: enhanced_k8s_cache_hit_rate < 0.5
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Low cache hit rate detected"
+        description: "Cache hit rate is {{ $value }}, which is below 50%."
+
+    - alert: PrometheusConnectionFailure
+      expr: enhanced_k8s_prometheus_connection_status == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Prometheus connection failure"
+        description: "Connection to Prometheus has failed for cluster {{ $labels.cluster }}."
+
+# Grafana Dashboard Configuration
+grafana_dashboard:
+  dashboard:
+    id: enhanced-k8s-monitoring
+    title: "Enhanced Kubernetes Monitoring"
+    tags: ["kubernetes", "monitoring", "enhanced"]
+    timezone: "browser"
+    refresh: "30s"
+    time:
+      from: "now-1h"
+      to: "now"
+    panels:
+    - title: "Cluster Overview"
+      type: "stat"
+      targets:
+      - expr: "enhanced_k8s_cluster_cpu_utilization"
+        legendFormat: "CPU Utilization"
+      - expr: "enhanced_k8s_cluster_memory_utilization"
+        legendFormat: "Memory Utilization"
+
+    - title: "Cache Performance"
+      type: "graph"
+      targets:
+      - expr: "enhanced_k8s_cache_hit_rate"
+        legendFormat: "Hit Rate"
+      - expr: "enhanced_k8s_cache_miss_rate"
+        legendFormat: "Miss Rate"
+
+    - title: "Query Performance"
+      type: "graph"
+      targets:
+      - expr: "histogram_quantile(0.95, enhanced_k8s_query_duration_seconds_bucket)"
+        legendFormat: "95th Percentile"
+      - expr: "histogram_quantile(0.50, enhanced_k8s_query_duration_seconds_bucket)"
+        legendFormat: "50th Percentile"
+
+# Performance Benchmarks and SLAs
+performance_targets:
+  cache_hit_rate: ">= 80%"
+  query_response_time_p95: "<= 500ms"
+  service_availability: ">= 99.9%"
+  prometheus_connection_uptime: ">= 99.5%"
+  concurrent_request_handling: ">= 100 req/s"
+
+# Health Check Configuration
+health_checks:
+  endpoints:
+    - name: "Service Health"
+      url: "/api/v1/kubernetes/enhanced/health"
+      interval: "30s"
+      timeout: "10s"
+      expected_status: 200
+
+    - name: "Cache Stats"
+      url: "/api/v1/kubernetes/enhanced/cache/stats"
+      interval: "60s"
+      timeout: "15s"
+      expected_status: 200
+
+    - name: "Query Templates"
+      url: "/api/v1/kubernetes/enhanced/prometheus/queries/templates"
+      interval: "300s"
+      timeout: "30s"
+      expected_status: 200
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "json"
+  outputs:
+    - type: "stdout"
+    - type: "file"
+      filename: "/var/log/enhanced-k8s-monitoring.log"
+      max_size: "100MB"
+      max_files: 5
+  
+  # Structured logging fields
+  fields:
+    service: "enhanced-k8s-monitoring"
+    version: "1.0.0"
+    environment: "production"
+
+# Security Configuration
+security:
+  authentication:
+    required: true
+    methods:
+      - "bearer_token"
+      - "basic_auth"
+  
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 100
+    burst_size: 20
+  
+  cors:
+    enabled: true
+    allowed_origins:
+      - "https://dashboard.company.com"
+      - "https://monitoring.company.com"
+  
+  tls:
+    enabled: true
+    cert_file: "/etc/ssl/certs/enhanced-k8s.crt"
+    key_file: "/etc/ssl/private/enhanced-k8s.key" 

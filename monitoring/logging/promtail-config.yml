@@ -1,0 +1,243 @@
+# Promtail Configuration for OpsSight Platform
+# Collects logs from various sources and forwards to Loki
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Backend application logs
+  - job_name: opssight-backend
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: opssight-backend
+          service: backend
+          environment: __environment__
+          __path__: /app/logs/*.log
+    
+    pipeline_stages:
+      # Parse JSON logs
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: message
+            logger: logger
+            request_id: request_id
+            trace_id: trace_id
+            user_id: user_id
+            category: category
+            component: component
+      
+      # Set timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      
+      # Set log level
+      - labels:
+          level:
+          category:
+          component:
+          service:
+          environment:
+      
+      # Drop noisy logs
+      - drop:
+          expression: '.*health.*'
+          drop_counter_reason: health_check
+      
+      # Rate limiting for high-volume logs
+      - limit:
+          rate: 1000
+          burst: 2000
+          by_label:
+            - service
+            - level
+
+  # Frontend application logs (from nginx)
+  - job_name: opssight-frontend
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: opssight-frontend
+          service: frontend
+          environment: __environment__
+          __path__: /var/log/nginx/*.log
+    
+    pipeline_stages:
+      # Parse nginx access logs
+      - regex:
+          expression: '^(?P<remote_addr>\S+) - (?P<remote_user>\S+) \[(?P<time_local>[^\]]+)\] "(?P<method>\S+) (?P<request_uri>\S+) (?P<protocol>\S+)" (?P<status>\d+) (?P<body_bytes_sent>\d+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)" (?P<request_time>\S+)'
+      
+      # Convert timestamp
+      - timestamp:
+          source: time_local
+          format: 02/Jan/2006:15:04:05 -0700
+      
+      # Set labels
+      - labels:
+          method:
+          status:
+          remote_addr:
+      
+      # Transform status to level
+      - template:
+          source: level
+          template: |
+            {{ if ge .status 500 }}error
+            {{ else if ge .status 400 }}warning
+            {{ else }}info{{ end }}
+      
+      # Add level label
+      - labels:
+          level:
+
+  # Database logs (PostgreSQL)
+  - job_name: postgresql
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: postgresql
+          service: database
+          environment: __environment__
+          __path__: /var/log/postgresql/*.log
+    
+    pipeline_stages:
+      # Parse PostgreSQL logs
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+) \[(?P<pid>\d+)\] (?P<level>\w+):  (?P<message>.*)'
+      
+      # Convert timestamp
+      - timestamp:
+          source: timestamp
+          format: 2006-01-02 15:04:05.000 MST
+      
+      # Set labels
+      - labels:
+          level:
+          pid:
+          service:
+
+  # Redis logs
+  - job_name: redis
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: redis
+          service: cache
+          environment: __environment__
+          __path__: /var/log/redis/*.log
+    
+    pipeline_stages:
+      # Parse Redis logs
+      - regex:
+          expression: '^(?P<pid>\d+):(?P<role>\w+) (?P<timestamp>\d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2}\.\d{3}) (?P<level>\w+) (?P<message>.*)'
+      
+      # Convert timestamp
+      - timestamp:
+          source: timestamp
+          format: 02 Jan 2006 15:04:05.000
+      
+      # Set labels
+      - labels:
+          level:
+          role:
+          service:
+
+  # System logs
+  - job_name: system
+    journal:
+      max_age: 24h
+      labels:
+        job: systemd-journal
+        service: system
+        environment: __environment__
+    
+    pipeline_stages:
+      # Extract systemd fields
+      - json:
+          expressions:
+            message: MESSAGE
+            unit: _SYSTEMD_UNIT
+            priority: PRIORITY
+            hostname: _HOSTNAME
+      
+      # Convert priority to log level
+      - template:
+          source: level
+          template: |
+            {{ if eq .priority "0" }}emergency
+            {{ else if eq .priority "1" }}alert
+            {{ else if eq .priority "2" }}critical
+            {{ else if eq .priority "3" }}error
+            {{ else if eq .priority "4" }}warning
+            {{ else if eq .priority "5" }}notice
+            {{ else if eq .priority "6" }}info
+            {{ else }}debug{{ end }}
+      
+      # Set labels
+      - labels:
+          level:
+          unit:
+          hostname:
+
+  # Kubernetes logs (if running in k8s)
+  - job_name: kubernetes-pods
+    kubernetes_sd_configs:
+      - role: pod
+    
+    relabel_configs:
+      # Only scrape pods with logging annotation
+      - source_labels:
+          - __meta_kubernetes_pod_annotation_prometheus_io_scrape
+        action: keep
+        regex: true
+      
+      # Set job name from annotation
+      - source_labels:
+          - __meta_kubernetes_pod_annotation_prometheus_io_job
+        target_label: job
+      
+      # Set service name
+      - source_labels:
+          - __meta_kubernetes_pod_label_app
+        target_label: service
+      
+      # Set namespace
+      - source_labels:
+          - __meta_kubernetes_namespace
+        target_label: namespace
+      
+      # Set pod name
+      - source_labels:
+          - __meta_kubernetes_pod_name
+        target_label: pod
+    
+    pipeline_stages:
+      # Parse container logs
+      - cri: {}
+      
+      # Extract JSON if present
+      - json:
+          expressions:
+            level: level
+            message: message
+            timestamp: timestamp
+            component: component
+      
+      # Set labels from extracted fields
+      - labels:
+          level:
+          component:

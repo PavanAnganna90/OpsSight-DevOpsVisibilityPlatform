@@ -1,0 +1,465 @@
+# OpsSight DevOps Platform - Infrastructure Management Workflow
+# Terraform automation with drift detection following cursor development standards
+
+name: 🏗️ Infrastructure Management
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infrastructure/**'
+      - '.github/workflows/infrastructure.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infrastructure/**'
+  schedule:
+    # Reason: Daily drift detection at 6 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+      target:
+        description: 'Terraform target (optional)'
+        required: false
+      auto_approve:
+        description: 'Auto-approve apply (use with caution)'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  # Reason: Terraform configuration
+  TF_VERSION: '~1.0'
+  TF_IN_AUTOMATION: true
+  TF_CLI_ARGS: '-no-color'
+  # Reason: AWS configuration
+  AWS_DEFAULT_REGION: us-west-2
+
+jobs:
+  # Terraform validation and planning
+  terraform-plan:
+    name: 📋 Terraform Plan
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./infrastructure
+    
+    outputs:
+      has-changes: ${{ steps.plan.outputs.has-changes }}
+      plan-file: ${{ steps.plan.outputs.plan-file }}
+      
+    steps:
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: 🔐 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: github-actions-terraform
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: 🗂️ Setup Terraform backend
+        run: |
+          # Reason: Initialize backend configuration
+          cat > backend.tf << EOF
+          terraform {
+            backend "s3" {
+              bucket         = "${{ secrets.TF_STATE_BUCKET }}"
+              key            = "opsight/terraform.tfstate"
+              region         = "${{ env.AWS_DEFAULT_REGION }}"
+              encrypt        = true
+              dynamodb_table = "${{ secrets.TF_STATE_LOCK_TABLE }}"
+            }
+          }
+          EOF
+
+      - name: 🚀 Terraform initialization
+        run: terraform init -input=false
+
+      - name: 🔍 Terraform format check
+        run: terraform fmt -check -recursive
+
+      - name: ✅ Terraform validation
+        run: terraform validate
+
+      - name: 📋 Terraform plan
+        id: plan
+        run: |
+          PLAN_FILE="tfplan-$(date +%Y%m%d-%H%M%S)"
+          TARGET_ARGS=""
+          
+          if [[ -n "${{ github.event.inputs.target }}" ]]; then
+            TARGET_ARGS="-target=${{ github.event.inputs.target }}"
+          fi
+          
+          terraform plan \
+            -input=false \
+            -out="${PLAN_FILE}" \
+            -detailed-exitcode \
+            ${TARGET_ARGS} \
+            || EXIT_CODE=$?
+          
+          case ${EXIT_CODE:-0} in
+            0)
+              echo "has-changes=false" >> $GITHUB_OUTPUT
+              echo "📋 No changes detected"
+              ;;
+            1)
+              echo "❌ Terraform plan failed"
+              exit 1
+              ;;
+            2)
+              echo "has-changes=true" >> $GITHUB_OUTPUT
+              echo "📋 Changes detected"
+              ;;
+          esac
+          
+          echo "plan-file=${PLAN_FILE}" >> $GITHUB_OUTPUT
+
+      - name: 📄 Generate plan summary
+        if: steps.plan.outputs.has-changes == 'true'
+        run: |
+          terraform show -no-color ${{ steps.plan.outputs.plan-file }} > plan-output.txt
+          
+          # Reason: Extract key metrics from plan
+          ADDITIONS=$(grep -c "# .* will be created" plan-output.txt || echo "0")
+          CHANGES=$(grep -c "# .* will be updated" plan-output.txt || echo "0")
+          DELETIONS=$(grep -c "# .* will be destroyed" plan-output.txt || echo "0")
+          
+          echo "📊 **Infrastructure Plan Summary**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- 🟢 Resources to create: ${ADDITIONS}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🟡 Resources to update: ${CHANGES}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔴 Resources to destroy: ${DELETIONS}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: 💾 Upload plan artifact
+        if: steps.plan.outputs.has-changes == 'true'
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-plan
+          path: |
+            infrastructure/${{ steps.plan.outputs.plan-file }}
+            infrastructure/plan-output.txt
+
+      - name: 💬 Comment plan on PR
+        if: github.event_name == 'pull_request' && steps.plan.outputs.has-changes == 'true'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const planOutput = fs.readFileSync('infrastructure/plan-output.txt', 'utf8');
+            
+            // Reason: Truncate output if too long for GitHub comment
+            const maxLength = 60000;
+            const truncatedOutput = planOutput.length > maxLength 
+              ? planOutput.substring(0, maxLength) + '\n... (output truncated)'
+              : planOutput;
+            
+            const commentBody = `## 🏗️ Terraform Plan Results
+            
+            ### Changes Detected
+            The following infrastructure changes will be applied:
+            
+            <details>
+            <summary>Click to view Terraform plan</summary>
+            
+            \`\`\`hcl
+            ${truncatedOutput}
+            \`\`\`
+            </details>
+            
+            **Plan file:** \`${{ steps.plan.outputs.plan-file }}\`
+            **Commit:** ${{ github.sha }}
+            `;
+            
+            // Create or update comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && comment.body.includes('🏗️ Terraform Plan Results')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: commentBody
+              });
+            }
+
+  # Terraform apply (only on main branch or manual trigger)
+  terraform-apply:
+    name: 🚀 Terraform Apply
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    if: |
+      (github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.terraform-plan.outputs.has-changes == 'true') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+    environment: infrastructure
+    defaults:
+      run:
+        working-directory: ./infrastructure
+    
+    steps:
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: 🔐 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: github-actions-terraform-apply
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: 🗂️ Setup Terraform backend
+        run: |
+          cat > backend.tf << EOF
+          terraform {
+            backend "s3" {
+              bucket         = "${{ secrets.TF_STATE_BUCKET }}"
+              key            = "opsight/terraform.tfstate"
+              region         = "${{ env.AWS_DEFAULT_REGION }}"
+              encrypt        = true
+              dynamodb_table = "${{ secrets.TF_STATE_LOCK_TABLE }}"
+            }
+          }
+          EOF
+
+      - name: 🚀 Terraform initialization
+        run: terraform init -input=false
+
+      - name: 📥 Download plan artifact
+        if: github.event_name != 'workflow_dispatch'
+        uses: actions/download-artifact@v3
+        with:
+          name: terraform-plan
+          path: infrastructure/
+
+      - name: 🚀 Terraform apply
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # Reason: Manual apply without plan file
+            TARGET_ARGS=""
+            AUTO_APPROVE=""
+            
+            if [[ -n "${{ github.event.inputs.target }}" ]]; then
+              TARGET_ARGS="-target=${{ github.event.inputs.target }}"
+            fi
+            
+            if [[ "${{ github.event.inputs.auto_approve }}" == "true" ]]; then
+              AUTO_APPROVE="-auto-approve"
+            fi
+            
+            terraform apply ${AUTO_APPROVE} ${TARGET_ARGS}
+          else
+            # Reason: Apply using plan file from artifact
+            terraform apply -input=false ${{ needs.terraform-plan.outputs.plan-file }}
+          fi
+
+      - name: 📊 Generate apply summary
+        run: |
+          echo "## 🚀 Infrastructure Apply Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ✅ Successfully applied" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+
+  # Terraform destroy (manual only)
+  terraform-destroy:
+    name: 🗑️ Terraform Destroy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+    environment: infrastructure-destroy
+    defaults:
+      run:
+        working-directory: ./infrastructure
+    
+    steps:
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: 🔐 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: github-actions-terraform-destroy
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: 🗂️ Setup Terraform backend
+        run: |
+          cat > backend.tf << EOF
+          terraform {
+            backend "s3" {
+              bucket         = "${{ secrets.TF_STATE_BUCKET }}"
+              key            = "opsight/terraform.tfstate"
+              region         = "${{ env.AWS_DEFAULT_REGION }}"
+              encrypt        = true
+              dynamodb_table = "${{ secrets.TF_STATE_LOCK_TABLE }}"
+            }
+          }
+          EOF
+
+      - name: 🚀 Terraform initialization
+        run: terraform init -input=false
+
+      - name: 🗑️ Terraform destroy
+        run: |
+          TARGET_ARGS=""
+          AUTO_APPROVE=""
+          
+          if [[ -n "${{ github.event.inputs.target }}" ]]; then
+            TARGET_ARGS="-target=${{ github.event.inputs.target }}"
+          fi
+          
+          if [[ "${{ github.event.inputs.auto_approve }}" == "true" ]]; then
+            AUTO_APPROVE="-auto-approve"
+          fi
+          
+          terraform destroy ${AUTO_APPROVE} ${TARGET_ARGS}
+
+      - name: ⚠️ Generate destroy summary
+        run: |
+          echo "## 🗑️ Infrastructure Destroy Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ⚠️ Resources destroyed" >> $GITHUB_STEP_SUMMARY
+          echo "**Target:** ${{ github.event.inputs.target || 'All resources' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Initiator:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+
+  # Drift detection
+  drift-detection:
+    name: 🔍 Drift Detection
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    defaults:
+      run:
+        working-directory: ./infrastructure
+    
+    steps:
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: 🔐 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: github-actions-drift-detection
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: 🗂️ Setup Terraform backend
+        run: |
+          cat > backend.tf << EOF
+          terraform {
+            backend "s3" {
+              bucket         = "${{ secrets.TF_STATE_BUCKET }}"
+              key            = "opsight/terraform.tfstate"
+              region         = "${{ env.AWS_DEFAULT_REGION }}"
+              encrypt        = true
+              dynamodb_table = "${{ secrets.TF_STATE_LOCK_TABLE }}"
+            }
+          }
+          EOF
+
+      - name: 🚀 Terraform initialization
+        run: terraform init -input=false
+
+      - name: 🔍 Check for drift
+        id: drift
+        run: |
+          terraform plan -detailed-exitcode -out=drift-plan || EXIT_CODE=$?
+          
+          case ${EXIT_CODE:-0} in
+            0)
+              echo "drift-detected=false" >> $GITHUB_OUTPUT
+              echo "✅ No infrastructure drift detected"
+              ;;
+            1)
+              echo "❌ Drift detection failed"
+              exit 1
+              ;;
+            2)
+              echo "drift-detected=true" >> $GITHUB_OUTPUT
+              echo "⚠️ Infrastructure drift detected"
+              ;;
+          esac
+
+      - name: 🚨 Create drift alert issue
+        if: steps.drift.outputs.drift-detected == 'true'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const title = `🚨 Infrastructure Drift Detected - ${new Date().toISOString().split('T')[0]}`;
+            const body = `## 🔍 Infrastructure Drift Alert
+            
+            **Detection Date:** ${new Date().toISOString()}
+            **Environment:** Production Infrastructure
+            
+            ### ⚠️ Drift Detected
+            Terraform has detected that the actual infrastructure state differs from the expected state defined in code.
+            
+            ### 🔧 Next Steps
+            1. Review the detected changes
+            2. Determine if changes are expected or unauthorized
+            3. Update Terraform configuration if needed
+            4. Apply corrections to align infrastructure with code
+            
+            ### 📋 Plan Output
+            Check the workflow logs for detailed plan output showing the detected differences.
+            
+            **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            `;
+            
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['infrastructure', 'drift-detection', 'alert']
+            }); 

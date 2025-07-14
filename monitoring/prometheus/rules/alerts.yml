@@ -1,0 +1,66 @@
+groups:
+  # Application health alerts
+  # Reason: Monitor critical application metrics
+  - name: application_health
+    rules:
+      - alert: HighRequestLatency
+        expr: http_request_duration_seconds{quantile="0.9"} > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High request latency on {{ $labels.instance }}"
+          description: "90th percentile of request latency is above 1s (current value: {{ $value }}s)"
+
+      - alert: APIHighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High API error rate"
+          description: "Error rate is above 10% (current value: {{ $value }})"
+
+  # Resource utilization alerts
+  # Reason: Prevent resource exhaustion
+  - name: resource_utilization
+    rules:
+      - alert: HighCPUUsage
+        expr: avg(rate(process_cpu_seconds_total[5m])) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is above 80% (current value: {{ $value }}%)"
+
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes / process_virtual_memory_bytes * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is above 80% (current value: {{ $value }}%)"
+
+  # Service availability alerts
+  # Reason: Ensure system uptime
+  - name: availability
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "Service has been down for more than 1 minute"
+
+      - alert: HighResponseTime
+        expr: probe_duration_seconds > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow response time for {{ $labels.instance }}"
+          description: "Response time is above 1s (current value: {{ $value }}s)" 

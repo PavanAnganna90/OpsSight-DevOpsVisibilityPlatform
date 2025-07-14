@@ -1,0 +1,294 @@
+# Kubernetes Network Policies for Enhanced Security
+# Implements zero-trust networking principles with least privilege access
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-network-policy
+  namespace: opssight
+  labels:
+    app: opssight
+    component: frontend
+    security-tier: dmz
+spec:
+  podSelector:
+    matchLabels:
+      app: opssight-frontend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from load balancer
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 3000
+  # Allow health checks from monitoring
+  - from:
+    - podSelector:
+        matchLabels:
+          app: prometheus
+    ports:
+    - protocol: TCP
+      port: 3000
+  egress:
+  # Allow egress to backend API
+  - to:
+    - podSelector:
+        matchLabels:
+          app: opssight-backend
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow HTTPS to external APIs
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-network-policy
+  namespace: opssight
+  labels:
+    app: opssight
+    component: backend
+    security-tier: application
+spec:
+  podSelector:
+    matchLabels:
+      app: opssight-backend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from frontend
+  - from:
+    - podSelector:
+        matchLabels:
+          app: opssight-frontend
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Allow health checks from monitoring
+  - from:
+    - podSelector:
+        matchLabels:
+          app: prometheus
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 9090  # Metrics port
+  # Allow ingress from API gateway/load balancer
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8000
+  egress:
+  # Allow egress to database
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow egress to Redis cache
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow HTTPS to external APIs (GitHub, GitLab, etc.)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow HTTP for webhooks (restricted by CIDR if needed)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: database-network-policy
+  namespace: opssight
+  labels:
+    app: opssight
+    component: database
+    security-tier: data
+spec:
+  podSelector:
+    matchLabels:
+      app: postgresql
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Only allow ingress from backend
+  - from:
+    - podSelector:
+        matchLabels:
+          app: opssight-backend
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow monitoring access
+  - from:
+    - podSelector:
+        matchLabels:
+          app: prometheus
+    ports:
+    - protocol: TCP
+      port: 9187  # PostgreSQL exporter port
+  egress:
+  # Allow DNS resolution only
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow NTP for time synchronization
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 123
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-network-policy
+  namespace: opssight
+  labels:
+    app: opssight
+    component: cache
+    security-tier: application
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Only allow ingress from backend
+  - from:
+    - podSelector:
+        matchLabels:
+          app: opssight-backend
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow monitoring access
+  - from:
+    - podSelector:
+        matchLabels:
+          app: prometheus
+    ports:
+    - protocol: TCP
+      port: 9121  # Redis exporter port
+  egress:
+  # Allow DNS resolution only
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: monitoring-network-policy
+  namespace: opssight
+  labels:
+    app: opssight
+    component: monitoring
+    security-tier: infrastructure
+spec:
+  podSelector:
+    matchLabels:
+      app: prometheus
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow access from Grafana
+  - from:
+    - podSelector:
+        matchLabels:
+          app: grafana
+    ports:
+    - protocol: TCP
+      port: 9090
+  # Allow ingress from load balancer for dashboards
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 9090
+  egress:
+  # Allow scraping all application metrics
+  - to:
+    - podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 8000  # Backend metrics
+    - protocol: TCP
+      port: 3000  # Frontend metrics
+    - protocol: TCP
+      port: 9187  # PostgreSQL exporter
+    - protocol: TCP
+      port: 9121  # Redis exporter
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow external alerting
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: opssight
+  labels:
+    app: opssight
+    security-policy: default-deny
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  # No rules = deny all traffic by default
+  # Specific allow rules are defined in other policies above

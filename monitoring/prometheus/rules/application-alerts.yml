@@ -1,0 +1,129 @@
+groups:
+  - name: opsight-application
+    interval: 30s
+    rules:
+      # Backend API alerts
+      - alert: BackendDown
+        expr: up{job="opsight-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: backend
+        annotations:
+          summary: "OpsSight Backend API is down"
+          description: "Backend API instance {{ $labels.instance }} has been down for more than 1 minute"
+          runbook_url: "https://docs.opsight.local/runbooks/backend-down"
+
+      - alert: BackendHighErrorRate
+        expr: rate(http_requests_total{job="opsight-backend",status=~"5.."}[5m]) / rate(http_requests_total{job="opsight-backend"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "High error rate in backend API"
+          description: "Backend API error rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+          runbook_url: "https://docs.opsight.local/runbooks/high-error-rate"
+
+      - alert: BackendHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="opsight-backend"}[5m])) > 2
+        for: 10m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "High latency in backend API"
+          description: "95th percentile latency is {{ $value }}s for backend API"
+          runbook_url: "https://docs.opsight.local/runbooks/high-latency"
+
+      - alert: BackendHighMemoryUsage
+        expr: process_resident_memory_bytes{job="opsight-backend"} / 1024 / 1024 > 1024
+        for: 15m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "High memory usage in backend"
+          description: "Backend memory usage is {{ $value | humanize }}MB"
+          runbook_url: "https://docs.opsight.local/runbooks/high-memory"
+
+      # Frontend alerts
+      - alert: FrontendDown
+        expr: up{job="opsight-frontend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: frontend
+        annotations:
+          summary: "OpsSight Frontend is down"
+          description: "Frontend instance {{ $labels.instance }} has been down for more than 2 minutes"
+          runbook_url: "https://docs.opsight.local/runbooks/frontend-down"
+
+      - alert: FrontendHighErrorRate
+        expr: rate(nginx_http_requests_total{job="opsight-frontend",status=~"5.."}[5m]) / rate(nginx_http_requests_total{job="opsight-frontend"}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: frontend
+        annotations:
+          summary: "High error rate in frontend"
+          description: "Frontend error rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+          runbook_url: "https://docs.opsight.local/runbooks/frontend-errors"
+
+      # Database connection alerts
+      - alert: DatabaseConnectionPoolExhausted
+        expr: database_connections_active{job="opsight-backend"} / database_connections_max{job="opsight-backend"} > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "Database connection pool usage is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.opsight.local/runbooks/db-connections"
+
+      - alert: SlowDatabaseQueries
+        expr: histogram_quantile(0.95, rate(database_query_duration_seconds_bucket{job="opsight-backend"}[5m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: "95th percentile query time is {{ $value }}s"
+          runbook_url: "https://docs.opsight.local/runbooks/slow-queries"
+
+      # GitHub Actions integration alerts
+      - alert: GitHubAPIRateLimitApproaching
+        expr: github_api_rate_limit_remaining{job="opsight-backend"} / github_api_rate_limit_total{job="opsight-backend"} < 0.2
+        for: 5m
+        labels:
+          severity: warning
+          service: github-integration
+        annotations:
+          summary: "GitHub API rate limit approaching"
+          description: "Only {{ $value | humanizePercentage }} of GitHub API rate limit remaining"
+          runbook_url: "https://docs.opsight.local/runbooks/github-rate-limit"
+
+      - alert: GitHubWebhookFailures
+        expr: rate(github_webhook_failures_total{job="opsight-backend"}[10m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: github-integration
+        annotations:
+          summary: "GitHub webhook failures detected"
+          description: "GitHub webhook failure rate: {{ $value }} failures/second"
+          runbook_url: "https://docs.opsight.local/runbooks/webhook-failures"
+
+      # Pipeline monitoring alerts
+      - alert: PipelineProcessingBacklog
+        expr: pipeline_queue_size{job="opsight-backend"} > 100
+        for: 10m
+        labels:
+          severity: warning
+          service: pipeline-processing
+        annotations:
+          summary: "Pipeline processing backlog growing"
+          description: "Pipeline queue size: {{ $value }} items"
+          runbook_url: "https://docs.opsight.local/runbooks/pipeline-backlog" 

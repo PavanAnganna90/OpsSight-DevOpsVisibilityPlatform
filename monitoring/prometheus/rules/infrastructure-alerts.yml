@@ -1,0 +1,150 @@
+groups:
+  - name: kubernetes-infrastructure
+    interval: 30s
+    rules:
+      # Node-level alerts
+      - alert: NodeDown
+        expr: up{job="kubernetes-nodes"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: node
+        annotations:
+          summary: "Kubernetes node is down"
+          description: "Node {{ $labels.instance }} has been down for more than 5 minutes"
+          runbook_url: "https://docs.opsight.local/runbooks/node-down"
+
+      - alert: NodeHighCPUUsage
+        expr: (1 - rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: node
+        annotations:
+          summary: "High CPU usage on node"
+          description: "CPU usage is {{ $value }}% on node {{ $labels.instance }}"
+          runbook_url: "https://docs.opsight.local/runbooks/high-cpu"
+
+      - alert: NodeHighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          component: node
+        annotations:
+          summary: "High memory usage on node"
+          description: "Memory usage is {{ $value }}% on node {{ $labels.instance }}"
+          runbook_url: "https://docs.opsight.local/runbooks/high-memory"
+
+      - alert: NodeDiskSpaceHigh
+        expr: (1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          component: node
+        annotations:
+          summary: "High disk usage on node"
+          description: "Disk usage is {{ $value }}% on {{ $labels.device }} of node {{ $labels.instance }}"
+          runbook_url: "https://docs.opsight.local/runbooks/high-disk"
+
+      - alert: NodeDiskSpaceCritical
+        expr: (1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})) * 100 > 95
+        for: 5m
+        labels:
+          severity: critical
+          component: node
+        annotations:
+          summary: "Critical disk usage on node"
+          description: "Disk usage is {{ $value }}% on {{ $labels.device }} of node {{ $labels.instance }}"
+          runbook_url: "https://docs.opsight.local/runbooks/critical-disk"
+
+      # Pod-level alerts
+      - alert: PodCrashLooping
+        expr: rate(kube_pod_container_status_restarts_total[5m]) * 60 * 5 > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: pod
+        annotations:
+          summary: "Pod is crash looping"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is restarting {{ $value }} times per 5 minutes"
+          runbook_url: "https://docs.opsight.local/runbooks/crash-loop"
+
+      - alert: PodNotReady
+        expr: kube_pod_status_ready{condition="false"} == 1
+        for: 15m
+        labels:
+          severity: warning
+          component: pod
+        annotations:
+          summary: "Pod not ready"
+          description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} has been in a non-ready state for more than 15 minutes"
+          runbook_url: "https://docs.opsight.local/runbooks/pod-not-ready"
+
+      - alert: PodHighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m]) * 100 > 80
+        for: 15m
+        labels:
+          severity: warning
+          component: pod
+        annotations:
+          summary: "High CPU usage in pod"
+          description: "Container {{ $labels.container }} in pod {{ $labels.namespace }}/{{ $labels.pod }} is using {{ $value }}% CPU"
+          runbook_url: "https://docs.opsight.local/runbooks/pod-high-cpu"
+
+      - alert: PodHighMemoryUsage
+        expr: container_memory_usage_bytes{container!="",container!="POD"} / container_spec_memory_limit_bytes{container!="",container!="POD"} > 0.9
+        for: 15m
+        labels:
+          severity: warning
+          component: pod
+        annotations:
+          summary: "High memory usage in pod"
+          description: "Container {{ $labels.container }} in pod {{ $labels.namespace }}/{{ $labels.pod }} is using {{ $value | humanizePercentage }} of its memory limit"
+          runbook_url: "https://docs.opsight.local/runbooks/pod-high-memory"
+
+      # Persistent Volume alerts
+      - alert: PersistentVolumeSpaceLow
+        expr: kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes < 0.1
+        for: 10m
+        labels:
+          severity: warning
+          component: storage
+        annotations:
+          summary: "Persistent volume space low"
+          description: "PV {{ $labels.persistentvolumeclaim }} in namespace {{ $labels.namespace }} has less than 10% space remaining"
+          runbook_url: "https://docs.opsight.local/runbooks/pv-space-low"
+
+      - alert: PersistentVolumeSpaceCritical
+        expr: kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes < 0.03
+        for: 5m
+        labels:
+          severity: critical
+          component: storage
+        annotations:
+          summary: "Persistent volume space critical"
+          description: "PV {{ $labels.persistentvolumeclaim }} in namespace {{ $labels.namespace }} has less than 3% space remaining"
+          runbook_url: "https://docs.opsight.local/runbooks/pv-space-critical"
+
+      # Cluster component alerts
+      - alert: KubernetesAPIServerDown
+        expr: up{job="kubernetes-apiservers"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: apiserver
+        annotations:
+          summary: "Kubernetes API server is down"
+          description: "Kubernetes API server has been down for more than 5 minutes"
+          runbook_url: "https://docs.opsight.local/runbooks/apiserver-down"
+
+      - alert: EtcdDown
+        expr: up{job="etcd"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: etcd
+        annotations:
+          summary: "etcd is down"
+          description: "etcd instance {{ $labels.instance }} has been down for more than 5 minutes"
+          runbook_url: "https://docs.opsight.local/runbooks/etcd-down" 
