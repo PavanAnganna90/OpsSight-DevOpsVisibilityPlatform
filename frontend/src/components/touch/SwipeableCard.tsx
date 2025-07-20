@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Swipeable Card Component
  * 

@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Pull to Refresh Component
  * 

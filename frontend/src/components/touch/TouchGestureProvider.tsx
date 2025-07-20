@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Touch Gesture Provider Component
  * 
