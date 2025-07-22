@@ -122,12 +122,18 @@ export default function InfrastructurePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Infrastructure</h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-2">Monitor and manage your infrastructure resources</p>
+              <h1 className="text-3xl font-bold text-blue-600 dark:text-blue-400">Platform Engineering</h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-2">Manage services, deployments, and infrastructure</p>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full border border-green-200 dark:border-green-800">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-sm font-medium">Infrastructure Healthy</span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 px-4 py-2 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full border border-green-200 dark:border-green-800">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-sm font-medium">All Systems Operational</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full border border-blue-200 dark:border-blue-800">
+                <Activity className="h-4 w-4" />
+                <span className="text-sm font-medium">99.9% uptime</span>
+              </div>
             </div>
           </div>
         </div>
@@ -138,74 +144,58 @@ export default function InfrastructurePage() {
         <section>
           <div className="flex items-center gap-2 mb-6">
             <Activity className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Infrastructure Overview</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Platform Overview</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <MetricCard
-              title="Active Servers" 
+              title="Active Services" 
               value="24"
               change="+2 this week"
               changeType="positive"
               icon={Server}
             />
             <MetricCard
-              title="CPU Usage"
-              value="67%"
-              change="Average across cluster"
-              changeType="neutral"
-              icon={Cpu}
+              title="System Uptime"
+              value="99.9%"
+              change="Last 30 days"
+              changeType="positive"
+              icon={Activity}
             />
             <MetricCard
-              title="Storage Used"
-              value="1.2TB"
-              change="78% of total capacity"
+              title="Deployments Today"
+              value="12"
+              change="+4 vs yesterday"
+              changeType="positive"
+              icon={Zap}
+            />
+            <MetricCard
+              title="Active Developers"
+              value="8"
+              change="2 deploying now"
               changeType="neutral"
               icon={HardDrive}
-            />
-            <MetricCard
-              title="Network Traffic"
-              value="450GB"
-              change="+12% this month"
-              changeType="positive"
-              icon={Network}
             />
           </div>
         </section>
 
-        {/* Kubernetes Clusters */}
+        {/* Services Status */}
         <section>
           <div className="flex items-center gap-2 mb-6">
             <Server className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Kubernetes Clusters</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Services Status</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <ClusterCard
-              name="Production Cluster"
-              description="Main production environment with high availability"
-              status="healthy"
-              version="k8s v1.28.2"
-              lastDeployed="1 hour ago"
-              nodes={12}
-              cpuUsage={67}
-            />
-            <ClusterCard
-              name="Staging Cluster"
-              description="Pre-production testing environment"
-              status="warning"
-              version="k8s v1.28.1"
-              lastDeployed="3 hours ago"
-              nodes={6}
-              cpuUsage={84}
-            />
-            <ClusterCard
-              name="Development Cluster"
-              description="Development and testing environment"
-              status="healthy"
-              version="k8s v1.27.8"
-              lastDeployed="2 days ago"
-              nodes={4}
-              cpuUsage={45}
-            />
+          <div className="space-y-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">User Authentication API</h3>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full border border-green-200 dark:border-green-800">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-sm font-medium">healthy</span>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
