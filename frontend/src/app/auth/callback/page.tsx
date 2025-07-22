@@ -22,18 +22,30 @@ function CallbackPageContent() {
           throw new Error('No authorization code received');
         }
 
-        // Exchange code for tokens
-        const response = await fetch('/api/v1/auth/github/callback', {
+        // Exchange code for tokens via backend OAuth endpoint
+        const response = await fetch('/api/v1/auth/oauth/github/callback', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ code }),
+          body: JSON.stringify({ 
+            code,
+            redirect_uri: `${window.location.origin}/auth/callback`,
+            state: searchParams?.get('state') 
+          }),
         });
 
         if (!response.ok) {
           const error = await response.json();
           throw new Error(error.message || 'Failed to authenticate');
+        }
+
+        const data = await response.json();
+
+        if (data.access_token) {
+          // Store JWT token
+          localStorage.setItem('auth_token', data.access_token);
+          localStorage.setItem('user_data', JSON.stringify(data.user || {}));
         }
 
         // Redirect to dashboard on success

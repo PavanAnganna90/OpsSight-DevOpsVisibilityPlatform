@@ -5,9 +5,9 @@
 
 import React from 'react';
 
-// OAuth configuration constants - using backend OAuth endpoint
-const BACKEND_OAUTH_URL = 'http://localhost:8000/api/v1/auth/oauth/github/authorize';
-const CLIENT_ID = (import.meta as any).env.VITE_GITHUB_CLIENT_ID || 'dev-client-id';
+// OAuth configuration constants - using backend OAuth endpoint via Next.js proxy
+const BACKEND_OAUTH_URL = '/api/v1/auth/oauth/github/authorize';
+const CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID || 'dev-client-id';
 const REDIRECT_URI = `${window.location.origin}/auth/callback`;
 const SCOPE = 'user:email read:user';
 

@@ -80,6 +80,12 @@ export default function HomePage() {
                 <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span>99.9% uptime</span>
               </div>
+              <Link
+                href="/auth/sso"
+                className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                Sign In
+              </Link>
             </div>
           </div>
         </div>
