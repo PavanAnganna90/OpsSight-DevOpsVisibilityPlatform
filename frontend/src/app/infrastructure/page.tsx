@@ -124,34 +124,40 @@ export default function InfrastructurePage() {
 
         {/* Resource Usage */}
         <section className="animate-fade-in" style={{ animationDelay: '400ms' }}>
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
             <Cpu className="h-5 w-5 text-primary" />
             Resource Usage
           </h2>
           <div className="bg-gradient-card border border-border rounded-lg p-6 shadow-soft">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-card-foreground">CPU Usage</span>
-                <span className="text-sm text-muted-foreground">67%</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-2">
-                <div className="bg-primary h-2 rounded-full" style={{ width: '67%' }}></div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-card-foreground">Memory Usage</span>
-                <span className="text-sm text-muted-foreground">84%</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-2">
-                <div className="bg-warning h-2 rounded-full" style={{ width: '84%' }}></div>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-card-foreground">CPU Usage</span>
+                  <span className="text-sm font-semibold text-primary">67%</span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2.5">
+                  <div className="bg-primary h-2.5 rounded-full transition-all duration-300" style={{ width: '67%' }}></div>
+                </div>
               </div>
               
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-card-foreground">Storage Usage</span>
-                <span className="text-sm text-muted-foreground">78%</span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-card-foreground">Memory Usage</span>
+                  <span className="text-sm font-semibold text-warning">84%</span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2.5">
+                  <div className="bg-warning h-2.5 rounded-full transition-all duration-300" style={{ width: '84%' }}></div>
+                </div>
               </div>
-              <div className="w-full bg-muted rounded-full h-2">
-                <div className="bg-success h-2 rounded-full" style={{ width: '78%' }}></div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-card-foreground">Storage Usage</span>
+                  <span className="text-sm font-semibold text-success">78%</span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2.5">
+                  <div className="bg-success h-2.5 rounded-full transition-all duration-300" style={{ width: '78%' }}></div>
+                </div>
               </div>
             </div>
           </div>
