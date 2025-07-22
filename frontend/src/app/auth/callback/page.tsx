@@ -16,10 +16,38 @@ function CallbackPageContent() {
   useEffect(() => {
     async function handleCallback() {
       try {
-        // Get the code from URL params
+        // Check for direct token in URL (from GitHub OAuth flow)
+        const token = searchParams?.get('token');
+        const provider = searchParams?.get('provider');
+        const error = searchParams?.get('error');
+
+        if (error) {
+          console.error('OAuth error:', error);
+          router.push('/auth/sso?error=oauth_failed');
+          return;
+        }
+
+        if (token) {
+          // Direct token flow (GitHub)
+          localStorage.setItem('auth_token', token);
+          localStorage.setItem('auth_provider', provider || 'github');
+          
+          // Get redirect URL from session storage
+          const redirectUrl = sessionStorage.getItem('oauth_redirect_url') || '/dashboard';
+          
+          // Clean up
+          sessionStorage.removeItem('oauth_state');
+          sessionStorage.removeItem('oauth_provider'); 
+          sessionStorage.removeItem('oauth_redirect_url');
+          
+          router.push(redirectUrl);
+          return;
+        }
+
+        // Fallback: OAuth code flow (for other providers)
         const code = searchParams?.get('code');
         if (!code) {
-          throw new Error('No authorization code received');
+          throw new Error('No authorization code or token received');
         }
 
         // Exchange code for tokens via backend OAuth endpoint
@@ -43,16 +71,14 @@ function CallbackPageContent() {
         const data = await response.json();
 
         if (data.access_token) {
-          // Store JWT token
           localStorage.setItem('auth_token', data.access_token);
           localStorage.setItem('user_data', JSON.stringify(data.user || {}));
         }
 
-        // Redirect to dashboard on success
         router.push('/dashboard');
       } catch (error) {
         console.error('Authentication error:', error);
-        router.push('/login');
+        router.push('/auth/sso?error=auth_failed');
       }
     }
 

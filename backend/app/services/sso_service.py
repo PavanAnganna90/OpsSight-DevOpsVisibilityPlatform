@@ -59,6 +59,17 @@ class SSOService:
         """Load OAuth provider configurations."""
         providers = {}
         
+        # Debug logging
+        logger.info(f"Loading OAuth providers...")
+        logger.info(f"GitHub Client ID: {settings.GITHUB_CLIENT_ID[:10]}..." if settings.GITHUB_CLIENT_ID else "GitHub Client ID not set")
+        logger.info(f"Google Client ID: {settings.GOOGLE_CLIENT_ID[:10]}..." if settings.GOOGLE_CLIENT_ID else "Google Client ID not set")
+        
+        # Check for empty strings
+        if settings.GITHUB_CLIENT_ID == "demo-github-client-id":
+            logger.warning("GitHub OAuth still using demo credentials")
+        if settings.GOOGLE_CLIENT_ID == "demo-google-client-id":
+            logger.warning("Google OAuth still using demo credentials")
+        
         # Google OAuth
         if all([
             settings.GOOGLE_CLIENT_ID,
@@ -75,7 +86,7 @@ class SSOService:
                 enabled=True,
                 auto_create_users=True,
                 default_role='viewer',
-                domain_restriction=settings.ALLOWED_EMAIL_DOMAINS
+                domain_restriction=settings.ALLOWED_EMAIL_DOMAINS_LIST
             )
 
         # GitHub OAuth
@@ -94,27 +105,26 @@ class SSOService:
                 enabled=True,
                 auto_create_users=True,
                 default_role='viewer',
-                domain_restriction=settings.ALLOWED_EMAIL_DOMAINS
+                domain_restriction=settings.ALLOWED_EMAIL_DOMAINS_LIST
             )
 
-        # Azure AD OAuth
+        # Microsoft/Azure AD OAuth
         if all([
-            settings.AZURE_CLIENT_ID,
-            settings.AZURE_CLIENT_SECRET,
-            settings.AZURE_TENANT_ID
+            settings.MICROSOFT_CLIENT_ID,
+            settings.MICROSOFT_CLIENT_SECRET
         ]):
-            providers['azure'] = OAuthProviderConfig(
-                provider_name='azure',
-                client_id=settings.AZURE_CLIENT_ID,
-                client_secret=settings.AZURE_CLIENT_SECRET,
-                authorization_url=f'https://login.microsoftonline.com/{settings.AZURE_TENANT_ID}/oauth2/v2.0/authorize',
-                token_url=f'https://login.microsoftonline.com/{settings.AZURE_TENANT_ID}/oauth2/v2.0/token',
+            providers['microsoft'] = OAuthProviderConfig(
+                provider_name='microsoft',
+                client_id=settings.MICROSOFT_CLIENT_ID,
+                client_secret=settings.MICROSOFT_CLIENT_SECRET,
+                authorization_url='https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+                token_url='https://login.microsoftonline.com/common/oauth2/v2.0/token',
                 user_info_url='https://graph.microsoft.com/v1.0/me',
                 scopes=['openid', 'profile', 'email'],
                 enabled=True,
                 auto_create_users=True,
                 default_role='viewer',
-                domain_restriction=settings.ALLOWED_EMAIL_DOMAINS
+                domain_restriction=settings.ALLOWED_EMAIL_DOMAINS_LIST
             )
 
         # GitLab OAuth
@@ -122,18 +132,19 @@ class SSOService:
             settings.GITLAB_CLIENT_ID,
             settings.GITLAB_CLIENT_SECRET
         ]):
+            gitlab_url = getattr(settings, 'GITLAB_URL', 'https://gitlab.com')
             providers['gitlab'] = OAuthProviderConfig(
                 provider_name='gitlab',
                 client_id=settings.GITLAB_CLIENT_ID,
                 client_secret=settings.GITLAB_CLIENT_SECRET,
-                authorization_url=f'{settings.GITLAB_URL}/oauth/authorize',
-                token_url=f'{settings.GITLAB_URL}/oauth/token',
-                user_info_url=f'{settings.GITLAB_URL}/api/v4/user',
+                authorization_url=f'{gitlab_url}/oauth/authorize',
+                token_url=f'{gitlab_url}/oauth/token',
+                user_info_url=f'{gitlab_url}/api/v4/user',
                 scopes=['read_user', 'read_api'],
                 enabled=True,
                 auto_create_users=True,
                 default_role='viewer',
-                domain_restriction=settings.ALLOWED_EMAIL_DOMAINS
+                domain_restriction=settings.ALLOWED_EMAIL_DOMAINS_LIST
             )
 
         return providers
@@ -142,37 +153,37 @@ class SSOService:
         """Load SAML provider configurations."""
         providers = {}
         
-        # Azure AD SAML
-        if all([
-            settings.AZURE_SAML_ENTITY_ID,
-            settings.AZURE_SAML_SSO_URL,
-            settings.AZURE_SAML_CERT
-        ]):
-            providers['azure_saml'] = SAMLProviderConfig(
-                provider_name='azure_saml',
-                entity_id=settings.AZURE_SAML_ENTITY_ID,
-                sso_url=settings.AZURE_SAML_SSO_URL,
-                x509_cert=settings.AZURE_SAML_CERT,
-                enabled=True,
-                auto_create_users=True,
-                default_role='viewer'
-            )
+        # Azure AD SAML - commented out for now
+        # if all([
+        #     getattr(settings, 'AZURE_SAML_ENTITY_ID', None),
+        #     getattr(settings, 'AZURE_SAML_SSO_URL', None),
+        #     getattr(settings, 'AZURE_SAML_CERT', None)
+        # ]):
+        #     providers['azure_saml'] = SAMLProviderConfig(
+        #         provider_name='azure_saml',
+        #         entity_id=settings.AZURE_SAML_ENTITY_ID,
+        #         sso_url=settings.AZURE_SAML_SSO_URL,
+        #         x509_cert=settings.AZURE_SAML_CERT,
+        #         enabled=True,
+        #         auto_create_users=True,
+        #         default_role='viewer'
+        #     )
 
-        # Okta SAML
-        if all([
-            settings.OKTA_SAML_ENTITY_ID,
-            settings.OKTA_SAML_SSO_URL,
-            settings.OKTA_SAML_CERT
-        ]):
-            providers['okta'] = SAMLProviderConfig(
-                provider_name='okta',
-                entity_id=settings.OKTA_SAML_ENTITY_ID,
-                sso_url=settings.OKTA_SAML_SSO_URL,
-                x509_cert=settings.OKTA_SAML_CERT,
-                enabled=True,
-                auto_create_users=True,
-                default_role='viewer'
-            )
+        # Okta SAML - commented out for now
+        # if all([
+        #     getattr(settings, 'OKTA_SAML_ENTITY_ID', None),
+        #     getattr(settings, 'OKTA_SAML_SSO_URL', None),
+        #     getattr(settings, 'OKTA_SAML_CERT', None)
+        # ]):
+        #     providers['okta'] = SAMLProviderConfig(
+        #         provider_name='okta',
+        #         entity_id=settings.OKTA_SAML_ENTITY_ID,
+        #         sso_url=settings.OKTA_SAML_SSO_URL,
+        #         x509_cert=settings.OKTA_SAML_CERT,
+        #         enabled=True,
+        #         auto_create_users=True,
+        #         default_role='viewer'
+        #     )
 
         return providers
 

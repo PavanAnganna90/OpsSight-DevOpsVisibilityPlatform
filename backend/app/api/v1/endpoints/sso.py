@@ -31,6 +31,9 @@ async def get_sso_config():
     Returns:
         SSO configuration with available providers and their status.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     oauth_providers = []
     saml_providers = []
     
@@ -38,23 +41,17 @@ async def get_sso_config():
     for provider in OAuthProvider:
         try:
             is_configured = OAuthProviderFactory.is_provider_configured(provider)
-            oauth_providers.append(SSOProviderInfo(
-                name=provider.value,
-                display_name=provider.value.title(),
-                icon=provider.value,
-                enabled=is_configured,
-                type="oauth2",
-                configured=is_configured
-            ))
-        except Exception:
-            oauth_providers.append(SSOProviderInfo(
-                name=provider.value,
-                display_name=provider.value.title(),
-                icon=provider.value,
-                enabled=False,
-                type="oauth2",
-                configured=False
-            ))
+            logger.info(f"Provider {provider.value} configured: {is_configured}")
+            if is_configured:
+                oauth_providers.append({
+                    "name": provider.value,
+                    "display_name": provider.value.title(),
+                    "icon": f"/icons/{provider.value}.svg",
+                    "enabled": True
+                })
+        except Exception as e:
+            logger.error(f"Error checking provider {provider.value}: {e}")
+            pass
     
     # Check SAML providers
     try:
@@ -94,10 +91,13 @@ async def get_sso_config():
         # SAML not available
         pass
     
+    logger.info(f"Returning oauth_providers: {oauth_providers}")
+    logger.info(f"Returning saml_providers: {saml_providers}")
+    
     return SSOConfigResponse(
         oauth_providers=oauth_providers,
         saml_providers=saml_providers,
-        sso_enabled=len([p for p in oauth_providers + saml_providers if p.enabled]) > 0,
+        sso_enabled=len(oauth_providers + saml_providers) > 0,
         default_provider=None
     )
 

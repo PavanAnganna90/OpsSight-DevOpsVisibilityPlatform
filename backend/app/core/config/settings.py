@@ -92,6 +92,16 @@ class Settings(BaseSettings):
     SAML_IDP_SSO_URL: str = Field(default="", env="SAML_IDP_SSO_URL")
     SAML_IDP_SLO_URL: str = Field(default="", env="SAML_IDP_SLO_URL")
     SAML_IDP_X509_CERT: str = Field(default="", env="SAML_IDP_X509_CERT")
+    
+    # Email Domain Restrictions
+    ALLOWED_EMAIL_DOMAINS: str = Field(default="", env="ALLOWED_EMAIL_DOMAINS")
+    
+    @property
+    def ALLOWED_EMAIL_DOMAINS_LIST(self) -> List[str]:
+        """Parse ALLOWED_EMAIL_DOMAINS string into a list."""
+        if not self.ALLOWED_EMAIL_DOMAINS:
+            return []
+        return [domain.strip() for domain in self.ALLOWED_EMAIL_DOMAINS.split(",") if domain.strip()]
 
     # JWT Settings
     JWT_SECRET_KEY: str

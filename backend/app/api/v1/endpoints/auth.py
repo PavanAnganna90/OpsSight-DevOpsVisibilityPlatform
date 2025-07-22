@@ -8,6 +8,7 @@ from typing import Any, Optional, Dict
 import uuid
 import logging
 from urllib.parse import urlencode, parse_qs
+import aiohttp
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, HTTPBearer, HTTPAuthorizationCredentials
@@ -831,3 +832,65 @@ async def get_user_sessions(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get user sessions"
         )
+
+
+@router.get("/callback/github")
+async def github_oauth_callback(
+    code: str,
+    state: str,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """Handle GitHub OAuth callback"""
+    try:
+        # Exchange code for access token
+        async with aiohttp.ClientSession() as session:
+            token_data = {
+                'client_id': settings.GITHUB_CLIENT_ID,
+                'client_secret': settings.GITHUB_CLIENT_SECRET,
+                'code': code
+            }
+            
+            async with session.post(
+                'https://github.com/login/oauth/access_token',
+                data=token_data,
+                headers={'Accept': 'application/json'}
+            ) as resp:
+                token_response = await resp.json()
+                
+            access_token = token_response.get('access_token')
+            if not access_token:
+                raise HTTPException(status_code=400, detail="Failed to get access token")
+            
+            # Get user info from GitHub
+            async with session.get(
+                'https://api.github.com/user',
+                headers={
+                    'Authorization': f'Bearer {access_token}',
+                    'Accept': 'application/json'
+                }
+            ) as resp:
+                user_data = await resp.json()
+            
+            # Get user email
+            async with session.get(
+                'https://api.github.com/user/emails',
+                headers={
+                    'Authorization': f'Bearer {access_token}',
+                    'Accept': 'application/json'
+                }
+            ) as resp:
+                emails = await resp.json()
+                primary_email = next((email['email'] for email in emails if email['primary']), None)
+            
+            if not primary_email:
+                raise HTTPException(status_code=400, detail="No primary email found")
+            
+            # Create JWT token for the user
+            jwt_token = create_access_token(data={"sub": primary_email, "name": user_data.get('name', '')})
+            
+            # Redirect to frontend with token
+            return RedirectResponse(f"http://localhost:3000/auth/callback?token={jwt_token}&provider=github")
+            
+    except Exception as e:
+        logger.error(f"GitHub OAuth callback error: {e}")
+        return RedirectResponse("http://localhost:3000/auth/sso?error=oauth_failed")
