@@ -46,7 +46,10 @@ class ApiService {
 
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl;
-    this.authToken = localStorage.getItem('auth_token');
+    // SSR-safe localStorage access
+    this.authToken = typeof window !== 'undefined' 
+      ? localStorage.getItem('auth_token') 
+      : null;
   }
 
   /**
