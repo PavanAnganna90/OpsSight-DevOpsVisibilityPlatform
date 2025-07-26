@@ -19,7 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import TIMESTAMP, JSONB, UUID
-from app.db.models import Base
+from app.db.database import Base
 from enum import Enum
 import uuid
 from typing import Optional, Dict, Any

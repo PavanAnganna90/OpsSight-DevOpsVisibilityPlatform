@@ -18,7 +18,7 @@ from prometheus_client import CollectorRegistry
 
 prometheus_client.REGISTRY = CollectorRegistry()
 
-from app.db.database import Base, AsyncSessionLocal
+from app.db.database import Base, SessionLocal, AsyncSessionLocal
 from app.models.user import User
 from app.models.team import Team, TeamRole
 from app.models.user_team import UserTeam

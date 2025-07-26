@@ -9,7 +9,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from enum import Enum
 
-from app.db.models import Base
+from app.db.database import Base
 
 
 class AuditEventType(str, Enum):

@@ -9,7 +9,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from enum import Enum
 
-from app.db.models import Base
+from app.db.database import Base
 
 
 class CollaborationType(str, Enum):

@@ -19,7 +19,7 @@ from enum import Enum
 from typing import Optional, Dict, Any, List
 import json
 
-from app.db.models import Base
+from app.db.database import Base
 
 
 class AlertSeverity(str, Enum):

@@ -21,7 +21,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.db.models import Base
+from app.db.database import Base
 
 
 class CostGranularity(str, Enum):

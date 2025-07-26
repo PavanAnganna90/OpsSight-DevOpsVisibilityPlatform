@@ -8,7 +8,7 @@ from sqlalchemy.sql import func
 from enum import Enum
 from typing import Optional, Dict, Any, List
 
-from app.db.models import Base
+from app.db.database import Base
 
 
 class ResourceType(str, Enum):

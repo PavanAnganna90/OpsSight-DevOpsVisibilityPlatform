@@ -4,13 +4,11 @@ Production-ready models with proper relationships and constraints
 """
 
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, Float, ForeignKey, JSON
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
 import uuid
-
-Base = declarative_base()
+from .database import Base
 
 class BaseModel(Base):
     """Base model with common fields"""
@@ -200,8 +198,8 @@ class SystemHealth(BaseModel):
     endpoint = Column(String(500))
     error_message = Column(Text)
     
-    # Metadata
-    metadata = Column(JSON, default={})
+    # Health check metadata
+    health_metadata = Column(JSON, default={})
     
     # Timestamp
     checked_at = Column(DateTime(timezone=True), default=func.now())

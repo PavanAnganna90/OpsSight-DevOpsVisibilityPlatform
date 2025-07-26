@@ -17,7 +17,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from typing import Optional, List, Dict, Any
 
-from app.db.models import Base
+from app.db.database import Base
 from app.models.user_permission import UserPermission
 
 

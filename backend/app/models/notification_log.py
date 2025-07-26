@@ -19,7 +19,7 @@ from enum import Enum
 from typing import Optional, Dict, Any
 import json
 
-from app.db.models import Base
+from app.db.database import Base
 
 
 class DeliveryStatus(str, Enum):

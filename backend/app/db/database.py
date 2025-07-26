@@ -6,9 +6,10 @@ Production-ready with connection pooling and proper error handling
 from sqlalchemy import create_engine, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import QueuePool
 import os
-from typing import Generator
+from typing import Generator, AsyncGenerator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,26 @@ engine = create_engine(
 # Configure session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Async database configuration (for tests and async endpoints)
+ASYNC_DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+
+# Create async engine for testing and async operations
+async_engine = create_async_engine(
+    ASYNC_DATABASE_URL,
+    pool_size=10,
+    max_overflow=20,
+    pool_pre_ping=True,
+    pool_recycle=3600,
+    echo=os.getenv("DEBUG", "false").lower() == "true"
+)
+
+# Configure async session factory
+AsyncSessionLocal = async_sessionmaker(
+    bind=async_engine,
+    class_=AsyncSession,
+    expire_on_commit=False
+)
+
 # Base for models
 Base = declarative_base()
 
@@ -50,6 +71,19 @@ def get_db() -> Generator[Session, None, None]:
         raise
     finally:
         db.close()
+
+async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Async database session generator for dependency injection
+    Ensures proper session cleanup
+    """
+    async with AsyncSessionLocal() as db:
+        try:
+            yield db
+        except Exception as e:
+            logger.error(f"Async database session error: {e}")
+            await db.rollback()
+            raise
 
 def init_db() -> None:
     """

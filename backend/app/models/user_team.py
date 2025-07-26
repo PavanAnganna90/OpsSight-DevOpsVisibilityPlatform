@@ -17,7 +17,7 @@ from sqlalchemy.sql import func
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-from app.db.models import Base
+from app.db.database import Base
 from app.models.team import TeamRole
 
 

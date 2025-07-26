@@ -23,7 +23,7 @@ from datetime import datetime
 import json
 import uuid
 
-from app.db.models import Base
+from app.db.database import Base
 
 
 class LogLevel(str, Enum):

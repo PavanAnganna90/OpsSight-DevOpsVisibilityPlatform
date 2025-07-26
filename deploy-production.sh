@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Production Deployment Script for OpsSight Platform
-# This script handles complete production deployment with SSL, monitoring, and security
+# OpsSight Platform - Enhanced Production Deployment Script
+# Comprehensive production deployment with monitoring, security, and backup
 
-set -euo pipefail
+set -e
 
 # Colors for output
 RED='\033[0;31m'

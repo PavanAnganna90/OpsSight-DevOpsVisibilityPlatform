@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router-dom';
 import App from '../App';
 
 // Mock the auth context
@@ -57,12 +57,12 @@ jest.mock('../components/auth/UserProfile', () => {
 // Mock globals.css import
 jest.mock('../globals.css', () => ({}));
 
-// Helper function to render app with specific route
-const renderWithRoute = (initialRoute = '/') => {
+// Helper function to render app with router
+const renderWithRouter = () => {
   return render(
-    <MemoryRouter initialEntries={[initialRoute]}>
+    <BrowserRouter>
       <App />
-    </MemoryRouter>
+    </BrowserRouter>
   );
 };
 
@@ -83,13 +83,13 @@ describe('App Component', () => {
     it('should show loading spinner when authentication is loading', () => {
       Object.assign(mockAuthState, { isLoading: true });
 
-      renderWithRoute('/dashboard');
+      renderWithRouter('/dashboard');
 
       expect(screen.getByRole('status', { hidden: true })).toBeInTheDocument();
     });
 
     it('should redirect to login when not authenticated and accessing protected route', () => {
-      renderWithRoute('/dashboard');
+      renderWithRouter('/dashboard');
 
       expect(screen.getByText('Welcome to OpsSight')).toBeInTheDocument();
       expect(screen.getByText('Sign in with your GitHub account to get started')).toBeInTheDocument();
@@ -101,7 +101,7 @@ describe('App Component', () => {
         user: { github_username: 'testuser' }
       });
 
-      renderWithRoute('/login');
+      renderWithRouter('/login');
 
       expect(screen.getByText('Welcome to your DevOps Dashboard')).toBeInTheDocument();
     });
@@ -109,7 +109,7 @@ describe('App Component', () => {
 
   describe('Route Rendering', () => {
     it('should render login page for /login route when unauthenticated', () => {
-      renderWithRoute('/login');
+      renderWithRouter('/login');
 
       expect(screen.getByText('Welcome to OpsSight')).toBeInTheDocument();
       expect(screen.getByText('Your comprehensive DevOps visibility platform')).toBeInTheDocument();
@@ -117,7 +117,7 @@ describe('App Component', () => {
     });
 
     it('should render OAuth callback component for /auth/callback route', () => {
-      renderWithRoute('/auth/callback');
+      renderWithRouter('/auth/callback');
 
       expect(screen.getByTestId('oauth-callback')).toBeInTheDocument();
     });
@@ -128,7 +128,7 @@ describe('App Component', () => {
         user: { github_username: 'testuser' }
       });
 
-      renderWithRoute('/dashboard');
+      renderWithRouter('/dashboard');
 
       expect(screen.getByText('Welcome to your DevOps Dashboard')).toBeInTheDocument();
       expect(screen.getByText('OpsSight')).toBeInTheDocument();
@@ -142,7 +142,7 @@ describe('App Component', () => {
         user: { github_username: 'testuser' }
       });
 
-      renderWithRoute('/profile');
+      renderWithRouter('/profile');
 
       expect(screen.getByText('User Profile')).toBeInTheDocument();
       expect(screen.getByTestId('user-profile-full')).toBeInTheDocument();
@@ -155,13 +155,13 @@ describe('App Component', () => {
         user: { github_username: 'testuser' }
       });
 
-      renderWithRoute('/');
+      renderWithRouter('/');
 
       expect(screen.getByText('Welcome to your DevOps Dashboard')).toBeInTheDocument();
     });
 
     it('should render 404 page for unknown routes', () => {
-      renderWithRoute('/unknown-route');
+      renderWithRouter('/unknown-route');
 
       expect(screen.getByText('404')).toBeInTheDocument();
       expect(screen.getByText('Page not found')).toBeInTheDocument();
@@ -171,7 +171,7 @@ describe('App Component', () => {
 
   describe('Login Page Features', () => {
     it('should display login page with proper branding', () => {
-      renderWithRoute('/login');
+      renderWithRouter('/login');
 
       expect(screen.getByText('Welcome to OpsSight')).toBeInTheDocument();
       expect(screen.getByText('Your comprehensive DevOps visibility platform')).toBeInTheDocument();
@@ -180,7 +180,7 @@ describe('App Component', () => {
     });
 
     it('should display security icon on login page', () => {
-      renderWithRoute('/login');
+      renderWithRouter('/login');
 
       const securityIcon = screen.getByRole('img', { hidden: true });
       expect(securityIcon).toBeInTheDocument();
@@ -196,7 +196,7 @@ describe('App Component', () => {
     });
 
     it('should display dashboard metrics cards', () => {
-      renderWithRoute('/dashboard');
+      renderWithRouter('/dashboard');
 
       expect(screen.getByText('Repositories')).toBeInTheDocument();
       expect(screen.getByText('Connected repositories')).toBeInTheDocument();
@@ -207,20 +207,20 @@ describe('App Component', () => {
     });
 
     it('should display initial metric values as zero', () => {
-      renderWithRoute('/dashboard');
+      renderWithRouter('/dashboard');
 
       const metricValues = screen.getAllByText('0');
       expect(metricValues).toHaveLength(3); // Repositories, Deployments, Alerts
     });
 
     it('should display header with application name', () => {
-      renderWithRoute('/dashboard');
+      renderWithRouter('/dashboard');
 
       expect(screen.getByText('OpsSight')).toBeInTheDocument();
     });
 
     it('should display user profile in header', () => {
-      renderWithRoute('/dashboard');
+      renderWithRouter('/dashboard');
 
       expect(screen.getByTestId('user-profile-compact')).toBeInTheDocument();
     });
@@ -235,14 +235,14 @@ describe('App Component', () => {
     });
 
     it('should display profile page with proper header', () => {
-      renderWithRoute('/profile');
+      renderWithRouter('/profile');
 
       expect(screen.getByText('User Profile')).toBeInTheDocument();
       expect(screen.getByText('OpsSight')).toBeInTheDocument();
     });
 
     it('should display user profile components', () => {
-      renderWithRoute('/profile');
+      renderWithRouter('/profile');
 
       expect(screen.getByTestId('user-profile-compact')).toBeInTheDocument();
       expect(screen.getByTestId('user-profile-full')).toBeInTheDocument();
@@ -251,7 +251,7 @@ describe('App Component', () => {
 
   describe('Navigation and Links', () => {
     it('should have working dashboard link in 404 page', () => {
-      renderWithRoute('/unknown-route');
+      renderWithRouter('/unknown-route');
 
       const dashboardLink = screen.getByText('Go to Dashboard');
       expect(dashboardLink).toHaveAttribute('href', '/dashboard');
@@ -282,7 +282,7 @@ describe('App Component', () => {
         user: { github_username: 'testuser' }
       });
 
-      renderWithRoute('/dashboard');
+      renderWithRouter('/dashboard');
 
       // Check for responsive grid classes
       const metricsGrid = screen.getByText('Repositories').closest('div')?.parentElement;
@@ -295,7 +295,7 @@ describe('App Component', () => {
         user: { github_username: 'testuser' }
       });
 
-      renderWithRoute('/dashboard');
+      renderWithRouter('/dashboard');
 
       const header = screen.getByRole('banner');
       expect(header.querySelector('.max-w-7xl')).toBeInTheDocument();
@@ -304,7 +304,7 @@ describe('App Component', () => {
 
   describe('Accessibility', () => {
     it('should have proper heading structure on login page', () => {
-      renderWithRoute('/login');
+      renderWithRouter('/login');
 
       const mainHeading = screen.getByRole('heading', { level: 2 });
       expect(mainHeading).toHaveTextContent('Welcome to OpsSight');
@@ -316,7 +316,7 @@ describe('App Component', () => {
         user: { github_username: 'testuser' }
       });
 
-      renderWithRoute('/dashboard');
+      renderWithRouter('/dashboard');
 
       const mainHeading = screen.getByRole('heading', { level: 1 });
       expect(mainHeading).toHaveTextContent('OpsSight');
@@ -326,7 +326,7 @@ describe('App Component', () => {
     });
 
     it('should have accessible form elements on login page', () => {
-      renderWithRoute('/login');
+      renderWithRouter('/login');
 
       const loginButton = screen.getByTestId('github-login-button');
       expect(loginButton).toBeInTheDocument();
@@ -338,7 +338,7 @@ describe('App Component', () => {
         user: { github_username: 'testuser' }
       });
 
-      renderWithRoute('/dashboard');
+      renderWithRouter('/dashboard');
 
       expect(screen.getByRole('banner')).toBeInTheDocument(); // header
       expect(screen.getByRole('main')).toBeInTheDocument(); // main content

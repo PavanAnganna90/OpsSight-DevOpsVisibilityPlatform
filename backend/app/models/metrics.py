@@ -22,7 +22,7 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 import json
 
-from app.db.models import Base
+from app.db.database import Base
 
 
 class MetricType(str, Enum):

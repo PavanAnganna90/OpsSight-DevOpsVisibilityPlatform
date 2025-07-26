@@ -9,7 +9,7 @@ from sqlalchemy.sql import func
 from typing import Optional, Dict, Any, List
 import json
 
-from app.db.models import Base
+from app.db.database import Base
 
 
 class Organization(Base):
