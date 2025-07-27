@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 
-from app.db.database import get_async_session
+from app.db.database import get_async_db
 from app.core.auth import get_current_user
 from app.models.user import User
 from app.models.audit_log import AuditEventType, AuditLogLevel

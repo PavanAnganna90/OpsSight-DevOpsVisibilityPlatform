@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from app.db.database import get_async_session
+from app.db.database import get_async_db
 from app.models.alert import Alert, AlertSeverity, AlertStatus
 from app.models.webhook_config import WebhookConfig
 from app.models.user import User
@@ -34,7 +34,7 @@ router = APIRouter()
 async def receive_generic_alert_webhook(
     request: Request,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_async_db)
 ) -> WebhookResponse:
     """
     Generic webhook endpoint for receiving alerts from external systems.
@@ -95,7 +95,7 @@ async def receive_generic_alert_webhook(
 async def receive_slack_event(
     request: Request,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_async_db)
 ) -> Dict[str, Any]:
     """
     Slack Events API endpoint for receiving Slack events and alerts.
@@ -142,7 +142,7 @@ async def receive_slack_event(
 async def receive_prometheus_alert(
     payload: Dict[str, Any],
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_async_db)
 ) -> WebhookResponse:
     """
     Prometheus Alertmanager webhook endpoint.
@@ -174,7 +174,7 @@ async def receive_prometheus_alert(
 async def receive_grafana_alert(
     payload: Dict[str, Any],
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_async_db)
 ) -> WebhookResponse:
     """
     Grafana webhook endpoint for receiving Grafana alerts.
@@ -204,7 +204,7 @@ async def receive_grafana_alert(
 async def receive_pagerduty_webhook(
     payload: Dict[str, Any],
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_async_db)
 ) -> WebhookResponse:
     """
     PagerDuty webhook endpoint for receiving incident updates.

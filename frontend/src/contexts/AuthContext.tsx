@@ -179,8 +179,13 @@ const STORAGE_KEYS = {
   USER_DATA: 'opsight_user_data',
 } as const;
 
-// API base URL - Use process.env for Jest compatibility
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
+// API base URL - Use different URLs for server-side vs client-side
+const getApiBaseUrl = () => {
+  const isServerSide = typeof window === 'undefined';
+  return isServerSide 
+    ? (process.env.API_BASE_URL || 'http://backend:8000/api/v1')
+    : (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1');
+};
 
 /**
  * Authentication Provider Component
@@ -308,7 +313,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     dispatch({ type: 'AUTH_START' });
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login/github`, {
+      const response = await fetch(`${getApiBaseUrl()}/auth/login/github`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -327,7 +332,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const tokens: AuthTokens = await response.json();
 
       // Get user data
-      const userResponse = await fetch(`${API_BASE_URL}/auth/me`, {
+      const userResponse = await fetch(`${getApiBaseUrl()}/auth/me`, {
         headers: {
           'Authorization': `Bearer ${tokens.access_token}`,
         },
@@ -360,7 +365,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       // Call logout endpoint if authenticated
       if (state.tokens?.access_token) {
-        await authenticatedFetch(`${API_BASE_URL}/auth/logout`, {
+        await authenticatedFetch(`${getApiBaseUrl()}/auth/logout`, {
           method: 'POST',
         });
       }
@@ -385,7 +390,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      const response = await fetch(`${getApiBaseUrl()}/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -423,7 +428,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
    */
   const getCurrentUser = async (): Promise<void> => {
     try {
-      const response = await authenticatedFetch(`${API_BASE_URL}/auth/me`);
+      const response = await authenticatedFetch(`${getApiBaseUrl()}/auth/me`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch user data');
@@ -571,7 +576,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (providerInfo.type === 'oauth2') {
         // Handle OAuth2 flow
-        const response = await fetch(`${API_BASE_URL}/auth/sso/oauth/${provider}/login`, {
+        const response = await fetch(`${getApiBaseUrl()}/auth/sso/oauth/${provider}/login`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -601,7 +606,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       } else if (providerInfo.type === 'saml') {
         // Handle SAML flow
-        const response = await fetch(`${API_BASE_URL}/auth/sso/saml/${provider}/login`, {
+        const response = await fetch(`${getApiBaseUrl()}/auth/sso/saml/${provider}/login`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -644,7 +649,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
    */
   const getAvailableProviders = async (): Promise<SSOProvider[]> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/sso/config`);
+      const response = await fetch(`${getApiBaseUrl()}/auth/sso/config`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch SSO providers');

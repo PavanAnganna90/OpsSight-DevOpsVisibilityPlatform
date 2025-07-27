@@ -11,6 +11,9 @@ import React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SSOLogin } from '@/components/auth/SSOLogin';
 
+// Force dynamic rendering to avoid static generation
+export const dynamic = 'force-dynamic';
+
 export default function SSOPage() {
   const router = useRouter();
   const searchParams = useSearchParams();

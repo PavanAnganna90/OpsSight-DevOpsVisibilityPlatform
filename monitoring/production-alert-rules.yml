@@ -1,0 +1,396 @@
+groups:
+  - name: opsight.production.critical
+    interval: 30s
+    rules:
+      # Critical Application Alerts
+      - alert: OpsSightApplicationDown
+        expr: up{job=~"opsight-.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: application
+          environment: production
+          team: platform
+        annotations:
+          summary: "OpsSight application {{ $labels.job }} is down"
+          description: "{{ $labels.job }} has been down for more than 1 minute in production environment"
+          runbook_url: "https://docs.opssight.dev/runbooks/application-down"
+          dashboard_url: "https://grafana.opssight.dev/d/overview/opsight-overview"
+
+      - alert: OpsSightHighErrorRate
+        expr: |
+          (
+            rate(http_requests_total{job=~"opsight-.*",status=~"5.."}[5m]) / 
+            rate(http_requests_total{job=~"opsight-.*"}[5m])
+          ) * 100 > 5
+        for: 5m
+        labels:
+          severity: critical
+          component: application
+          environment: production
+          team: platform
+        annotations:
+          summary: "High error rate detected in OpsSight application"
+          description: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.job }} (threshold: 5%)"
+          runbook_url: "https://docs.opssight.dev/runbooks/high-error-rate"
+
+      - alert: OpsSightHighResponseTime
+        expr: |
+          histogram_quantile(0.95, 
+            rate(http_request_duration_seconds_bucket{job=~"opsight-.*"}[5m])
+          ) > 2
+        for: 10m
+        labels:
+          severity: critical
+          component: application
+          environment: production
+          team: platform
+        annotations:
+          summary: "High response time detected in OpsSight application"
+          description: "95th percentile response time is {{ $value }}s for {{ $labels.job }} (threshold: 2s)"
+          runbook_url: "https://docs.opssight.dev/runbooks/high-response-time"
+
+      # Infrastructure Critical Alerts
+      - alert: KubernetesNodeDown
+        expr: up{job="kubernetes-nodes"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: infrastructure
+          environment: production
+          team: platform
+        annotations:
+          summary: "Kubernetes node {{ $labels.instance }} is down"
+          description: "Node {{ $labels.instance }} has been unreachable for more than 5 minutes"
+          runbook_url: "https://docs.opssight.dev/runbooks/node-down"
+
+      - alert: KubernetesPodCrashLooping
+        expr: |
+          rate(kube_pod_container_status_restarts_total{namespace="opsight"}[15m]) * 60 * 15 > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: kubernetes
+          environment: production
+          team: platform
+        annotations:
+          summary: "Pod {{ $labels.pod }} is crash looping"
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is restarting frequently"
+          runbook_url: "https://docs.opssight.dev/runbooks/pod-crash-loop"
+
+      # Database Critical Alerts
+      - alert: PostgreSQLDown
+        expr: pg_up == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+          environment: production
+          team: platform
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL database has been unreachable for more than 2 minutes"
+          runbook_url: "https://docs.opssight.dev/runbooks/postgresql-down"
+
+      - alert: PostgreSQLHighConnections
+        expr: |
+          (
+            pg_stat_activity_count / pg_settings_max_connections
+          ) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+          environment: production
+          team: platform
+        annotations:
+          summary: "PostgreSQL connection usage is critically high"
+          description: "Connection usage is {{ $value | humanizePercentage }} (threshold: 90%)"
+          runbook_url: "https://docs.opssight.dev/runbooks/postgresql-high-connections"
+
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: cache
+          environment: production
+          team: platform
+        annotations:
+          summary: "Redis cache is down"
+          description: "Redis cache has been unreachable for more than 2 minutes"
+          runbook_url: "https://docs.opssight.dev/runbooks/redis-down"
+
+  - name: opsight.production.warning
+    interval: 60s
+    rules:
+      # Application Warning Alerts
+      - alert: OpsSightHighCPUUsage
+        expr: |
+          (
+            rate(container_cpu_usage_seconds_total{pod=~"opsight-.*"}[5m])
+          ) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: application
+          environment: production
+          team: platform
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value | humanizePercentage }} for {{ $labels.pod }}"
+          runbook_url: "https://docs.opssight.dev/runbooks/high-cpu-usage"
+
+      - alert: OpsSightHighMemoryUsage
+        expr: |
+          (
+            container_memory_usage_bytes{pod=~"opsight-.*"} / 
+            container_spec_memory_limit_bytes{pod=~"opsight-.*"}
+          ) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          component: application
+          environment: production
+          team: platform
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value | humanizePercentage }} for {{ $labels.pod }}"
+          runbook_url: "https://docs.opssight.dev/runbooks/high-memory-usage"
+
+      - alert: OpsSightSlowResponseTime
+        expr: |
+          histogram_quantile(0.95, 
+            rate(http_request_duration_seconds_bucket{job=~"opsight-.*"}[5m])
+          ) > 1
+        for: 15m
+        labels:
+          severity: warning
+          component: application
+          environment: production
+          team: platform
+        annotations:
+          summary: "Slow response time detected"
+          description: "95th percentile response time is {{ $value }}s for {{ $labels.job }}"
+          runbook_url: "https://docs.opssight.dev/runbooks/slow-response-time"
+
+      # Infrastructure Warning Alerts
+      - alert: NodeHighCPUUsage
+        expr: |
+          100 - (avg by (instance) (
+            rate(node_cpu_seconds_total{mode="idle"}[5m])
+          ) * 100) > 80
+        for: 15m
+        labels:
+          severity: warning
+          component: infrastructure
+          environment: production
+          team: platform
+        annotations:
+          summary: "High CPU usage on node {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | humanizePercentage }} on node {{ $labels.instance }}"
+          runbook_url: "https://docs.opssight.dev/runbooks/node-high-cpu"
+
+      - alert: NodeHighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 15m
+        labels:
+          severity: warning
+          component: infrastructure
+          environment: production
+          team: platform
+        annotations:
+          summary: "High memory usage on node {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | humanizePercentage }} on node {{ $labels.instance }}"
+          runbook_url: "https://docs.opssight.dev/runbooks/node-high-memory"
+
+      - alert: NodeHighDiskUsage
+        expr: |
+          (1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes)) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          component: infrastructure
+          environment: production
+          team: platform
+        annotations:
+          summary: "High disk usage on node {{ $labels.instance }}"
+          description: "Disk usage is {{ $value | humanizePercentage }} on {{ $labels.device }} ({{ $labels.mountpoint }})"
+          runbook_url: "https://docs.opssight.dev/runbooks/node-high-disk"
+
+      # Database Warning Alerts
+      - alert: PostgreSQLSlowQueries
+        expr: |
+          rate(pg_stat_activity_max_tx_duration[5m]) > 300
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+          environment: production
+          team: platform
+        annotations:
+          summary: "PostgreSQL slow queries detected"
+          description: "Slow queries detected with max duration {{ $value }}s"
+          runbook_url: "https://docs.opssight.dev/runbooks/postgresql-slow-queries"
+
+      - alert: PostgreSQLHighConnections
+        expr: |
+          (
+            pg_stat_activity_count / pg_settings_max_connections
+          ) * 100 > 75
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+          environment: production
+          team: platform
+        annotations:
+          summary: "PostgreSQL connection usage is high"
+          description: "Connection usage is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.opssight.dev/runbooks/postgresql-high-connections"
+
+      - alert: RedisHighMemoryUsage
+        expr: |
+          (redis_memory_used_bytes / redis_memory_max_bytes) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          component: cache
+          environment: production
+          team: platform
+        annotations:
+          summary: "Redis memory usage is high"
+          description: "Redis memory usage is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.opssight.dev/runbooks/redis-high-memory"
+
+  - name: opsight.production.security
+    interval: 300s
+    rules:
+      # Security Alerts
+      - alert: UnauthorizedAPIAccess
+        expr: |
+          rate(http_requests_total{job=~"opsight-.*",status="401"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+          environment: production
+          team: security
+        annotations:
+          summary: "High rate of unauthorized API access attempts"
+          description: "Rate of 401 responses is {{ $value }} req/sec"
+          runbook_url: "https://docs.opssight.dev/runbooks/unauthorized-access"
+
+      - alert: CertificateExpiringSoon
+        expr: |
+          (probe_ssl_earliest_cert_expiry - time()) / 86400 < 30
+        for: 1h
+        labels:
+          severity: warning
+          component: security
+          environment: production
+          team: platform
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "SSL certificate for {{ $labels.instance }} expires in {{ $value }} days"
+          runbook_url: "https://docs.opssight.dev/runbooks/certificate-expiry"
+
+      - alert: CertificateExpiringSoonCritical
+        expr: |
+          (probe_ssl_earliest_cert_expiry - time()) / 86400 < 7
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+          environment: production
+          team: platform
+        annotations:
+          summary: "SSL certificate expiring within 7 days"
+          description: "SSL certificate for {{ $labels.instance }} expires in {{ $value }} days"
+          runbook_url: "https://docs.opssight.dev/runbooks/certificate-expiry"
+
+  - name: opsight.production.business
+    interval: 300s
+    rules:
+      # Business Logic Alerts
+      - alert: LowUserActivity
+        expr: |
+          rate(http_requests_total{job="opsight-frontend",path=~"/dashboard.*"}[1h]) < 0.1
+        for: 30m
+        labels:
+          severity: warning
+          component: business
+          environment: production
+          team: product
+        annotations:
+          summary: "Low user activity detected"
+          description: "Dashboard access rate is {{ $value }} req/sec (below normal threshold)"
+          runbook_url: "https://docs.opssight.dev/runbooks/low-user-activity"
+
+      - alert: HighFailedDeployments
+        expr: |
+          (
+            rate(deployment_attempts_total{status="failed"}[1h]) / 
+            rate(deployment_attempts_total[1h])
+          ) * 100 > 10
+        for: 15m
+        labels:
+          severity: warning
+          component: business
+          environment: production
+          team: platform
+        annotations:
+          summary: "High rate of failed deployments"
+          description: "Failed deployment rate is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.opssight.dev/runbooks/high-failed-deployments"
+
+      - alert: APIRateLimitApproaching
+        expr: |
+          rate(http_requests_total{job=~"opsight-.*"}[5m]) > 800
+        for: 10m
+        labels:
+          severity: warning
+          component: business
+          environment: production
+          team: platform
+        annotations:
+          summary: "API rate limit approaching"
+          description: "Current request rate is {{ $value }} req/sec (limit: 1000 req/sec)"
+          runbook_url: "https://docs.opssight.dev/runbooks/api-rate-limit"
+
+  - name: opsight.production.sla
+    interval: 60s
+    rules:
+      # SLA Monitoring
+      - alert: SLAAvailabilityBreach
+        expr: |
+          (
+            avg_over_time(up{job=~"opsight-.*"}[5m])
+          ) < 0.999
+        for: 0m
+        labels:
+          severity: critical
+          component: sla
+          environment: production
+          team: platform
+        annotations:
+          summary: "SLA availability breach detected"
+          description: "Availability is {{ $value | humanizePercentage }} (SLA: 99.9%)"
+          runbook_url: "https://docs.opssight.dev/runbooks/sla-breach"
+
+      - alert: SLAResponseTimeBreach
+        expr: |
+          histogram_quantile(0.95, 
+            rate(http_request_duration_seconds_bucket{job=~"opsight-.*"}[5m])
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: sla
+          environment: production
+          team: platform
+        annotations:
+          summary: "SLA response time breach detected"
+          description: "95th percentile response time is {{ $value }}s (SLA: 1s)"
+          runbook_url: "https://docs.opssight.dev/runbooks/sla-response-time-breach"

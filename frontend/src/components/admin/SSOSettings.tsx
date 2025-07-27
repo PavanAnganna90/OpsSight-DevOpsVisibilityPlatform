@@ -19,7 +19,7 @@ import {
   CogIcon,
 } from '@heroicons/react/24/outline';
 
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { DashboardCard } from '@/components/layout/DashboardCard';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import { TextField } from '@/components/ui/TextField';

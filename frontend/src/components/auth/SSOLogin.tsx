@@ -13,7 +13,7 @@ import {
   CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { Toast } from '@/components/ui/Toast';
 
 interface SSOProvider {
@@ -47,6 +47,7 @@ export function SSOLogin({
   const router = useRouter();
   const [ssoConfig, setSSOConfig] = useState<SSOConfig | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
   const [processingProvider, setProcessingProvider] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{
@@ -56,12 +57,23 @@ export function SSOLogin({
   }>({ message: '', type: 'success', show: false });
 
   useEffect(() => {
-    fetchSSOConfig();
+    setMounted(true);
   }, []);
+
+  useEffect(() => {
+    // Only fetch after component is mounted on client-side
+    if (mounted) {
+      fetchSSOConfig();
+    }
+  }, [mounted]);
 
   const fetchSSOConfig = async () => {
     try {
-      const response = await fetch('/api/v1/auth/sso/config');
+      // Always use client-side URL since we're only calling this after mount
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
+      
+      console.log('Fetching SSO config from:', API_BASE_URL);
+      const response = await fetch(`${API_BASE_URL}/auth/sso/config`);
       if (!response.ok) {
         throw new Error('Failed to fetch SSO configuration');
       }
@@ -93,7 +105,11 @@ export function SSOLogin({
       }
 
       // For other providers, try the API endpoint
-      const response = await fetch(`/api/v1/auth/sso/oauth/${provider}/login`, {
+      const isServerSide = typeof window === 'undefined';
+      const API_BASE_URL = isServerSide 
+        ? (process.env.API_BASE_URL || 'http://backend:8000/api/v1')
+        : (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1');
+      const response = await fetch(`${API_BASE_URL}/auth/sso/oauth/${provider}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -139,7 +155,11 @@ export function SSOLogin({
 
     try {
       // Initiate SAML flow
-      const response = await fetch(`/api/v1/auth/saml/${provider}/login`, {
+      const isServerSide = typeof window === 'undefined';
+      const API_BASE_URL = isServerSide 
+        ? (process.env.API_BASE_URL || 'http://backend:8000/api/v1')
+        : (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1');
+      const response = await fetch(`${API_BASE_URL}/auth/saml/${provider}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -227,7 +247,8 @@ export function SSOLogin({
     setTimeout(() => setToast(prev => ({ ...prev, show: false })), 5000);
   };
 
-  if (loading) {
+  // Show loading during SSR and initial client load
+  if (!mounted || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">

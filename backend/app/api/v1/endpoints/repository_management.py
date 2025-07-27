@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from pydantic import BaseModel, Field, validator
 
 from app.core.database import get_db
@@ -472,7 +473,7 @@ async def get_repository_management_health(
     """Health check for repository management service"""
     try:
         # Test database connection
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         
         # Test cache connection
         await cache.set("repo_health_check", "ok", ttl=10)

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 
-from app.db.database import get_async_session
+from app.db.database import get_async_db
 from app.core.auth import get_current_user
 from app.models.user import User
 from app.models.team_collaboration import CollaborationType, CollaborationStatus
@@ -130,7 +130,7 @@ async def create_collaboration_request(
     request: Request,
     collaboration_data: CollaborationRequestCreate,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_db)
 ):
     """Create a new collaboration request."""
     
@@ -199,7 +199,7 @@ async def get_team_collaborations(
     limit: int = Query(50, ge=1, le=200, description="Limit results"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_db)
 ):
     """Get collaborations for a team."""
     
@@ -261,7 +261,7 @@ async def approve_collaboration(
     request: Request,
     approval_data: CollaborationApprovalRequest,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_db)
 ):
     """Approve or reject a collaboration request."""
     
@@ -301,7 +301,7 @@ async def share_resource(
     request: Request,
     resource_data: SharedResourceCreate,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_db)
 ):
     """Share a resource as part of a collaboration."""
     
@@ -346,7 +346,7 @@ async def get_shared_resources(
     resource_type: Optional[str] = Query(None, description="Filter by resource type"),
     active_only: bool = Query(True, description="Only return active resources"),
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_db)
 ):
     """Get resources shared with a team."""
     
@@ -387,7 +387,7 @@ async def revoke_shared_resource(
     request: Request,
     reason: Optional[str] = Query(None, description="Reason for revocation"),
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_db)
 ):
     """Revoke access to a shared resource."""
     
@@ -419,7 +419,7 @@ async def get_collaboration_activity(
     limit: int = Query(50, ge=1, le=200, description="Limit results"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_db)
 ):
     """Get activity feed for a collaboration."""
     
@@ -464,7 +464,7 @@ async def get_collaboration_analytics(
     start_date: Optional[datetime] = Query(None, description="Start date for analytics"),
     end_date: Optional[datetime] = Query(None, description="End date for analytics"),
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_db)
 ):
     """Get collaboration analytics for a team."""
     
@@ -488,7 +488,7 @@ async def track_resource_access(
     resource_id: int,
     request: Request,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_db)
 ):
     """Track access to a shared resource."""
     

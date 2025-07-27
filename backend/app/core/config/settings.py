@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     # Application Settings
     APP_NAME: str
     APP_ENV: str
+    ENVIRONMENT: str = Field(default="development", env="ENVIRONMENT")
     DEBUG: bool
     SECRET_KEY: str
 

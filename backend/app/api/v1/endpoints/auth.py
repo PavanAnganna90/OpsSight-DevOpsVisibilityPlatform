@@ -471,28 +471,57 @@ async def logout(
 async def get_sso_config(db: AsyncSession = Depends(get_async_db)) -> Any:
     """Get SSO configuration and available providers."""
     try:
-        from app.services.sso_service import SSOService
-        sso_service = SSOService(db)
-        
+        # Simplified SSO config that doesn't depend on complex provider system
         oauth_providers = []
-        for name, config in sso_service.oauth_providers.items():
-            if config.enabled:
-                oauth_providers.append({
-                    "name": name,
-                    "display_name": name.title(),
-                    "icon": f"/{name}-icon.svg",
-                    "enabled": config.enabled
-                })
         
+        # Check GitHub OAuth
+        if (hasattr(settings, 'GITHUB_CLIENT_ID') and 
+            settings.GITHUB_CLIENT_ID and 
+            settings.GITHUB_CLIENT_ID != 'docker-client-id' and
+            hasattr(settings, 'GITHUB_CLIENT_SECRET') and 
+            settings.GITHUB_CLIENT_SECRET):
+            oauth_providers.append({
+                "name": "github",
+                "display_name": "GitHub",
+                "icon": "/github-icon.svg",
+                "enabled": True
+            })
+        
+        # Check Google OAuth
+        if (hasattr(settings, 'GOOGLE_CLIENT_ID') and 
+            settings.GOOGLE_CLIENT_ID and 
+            settings.GOOGLE_CLIENT_ID != 'demo-google-client-id' and
+            hasattr(settings, 'GOOGLE_CLIENT_SECRET') and 
+            settings.GOOGLE_CLIENT_SECRET):
+            oauth_providers.append({
+                "name": "google",
+                "display_name": "Google",
+                "icon": "/google-icon.svg",
+                "enabled": True
+            })
+        
+        # Check Microsoft OAuth
+        if (hasattr(settings, 'MICROSOFT_CLIENT_ID') and 
+            settings.MICROSOFT_CLIENT_ID and
+            hasattr(settings, 'MICROSOFT_CLIENT_SECRET') and 
+            settings.MICROSOFT_CLIENT_SECRET):
+            oauth_providers.append({
+                "name": "microsoft",
+                "display_name": "Microsoft",
+                "icon": "/microsoft-icon.svg",
+                "enabled": True
+            })
+        
+        # Always add demo login for development
+        oauth_providers.append({
+            "name": "demo",
+            "display_name": "Demo Login",
+            "icon": "/demo-icon.svg",
+            "enabled": True
+        })
+        
+        # No SAML providers configured yet
         saml_providers = []
-        for name, config in sso_service.saml_providers.items():
-            if config.enabled:
-                saml_providers.append({
-                    "name": name,
-                    "display_name": name.replace('_', ' ').title(),
-                    "icon": f"/{name}-icon.svg",
-                    "enabled": config.enabled
-                })
         
         return SSOConfigResponse(
             oauth_providers=oauth_providers,
@@ -502,10 +531,17 @@ async def get_sso_config(db: AsyncSession = Depends(get_async_db)) -> Any:
         )
     except Exception as e:
         logger.error(f"Error getting SSO config: {str(e)}")
+        # Return basic demo configuration as fallback
         return SSOConfigResponse(
-            oauth_providers=[],
+            oauth_providers=[{
+                "name": "demo",
+                "display_name": "Demo Login",
+                "icon": "/demo-icon.svg",
+                "enabled": True
+            }],
             saml_providers=[],
-            sso_enabled=False
+            sso_enabled=True,
+            default_provider="demo"
         )
 
 
@@ -894,3 +930,65 @@ async def github_oauth_callback(
     except Exception as e:
         logger.error(f"GitHub OAuth callback error: {e}")
         return RedirectResponse("http://localhost:3000/auth/sso?error=oauth_failed")
+
+
+@router.post("/demo-token")
+async def get_demo_token(db: AsyncSession = Depends(get_async_db)) -> Any:
+    """Get demo authentication token for development/testing."""
+    try:
+        from app.repositories.user import UserRepository
+        
+        user_repository = UserRepository(db)
+        
+        # Try to find demo user, create if doesn't exist
+        demo_user = await user_repository.get_by_email("demo@opsight.local")
+        
+        if not demo_user:
+            # Create demo user
+            import uuid
+            from app.core.auth.jwt import hash_password
+            
+            demo_user_data = {
+                "email": "demo@opsight.local",
+                "full_name": "Demo User",
+                "github_username": "demo-user",
+                "github_id": str(uuid.uuid4()),
+                "organization_id": 1,
+                "is_active": True,
+                "password_hash": hash_password("demo123"),
+                "avatar_url": "https://via.placeholder.com/150",
+                "bio": "Demo user for testing OpsSight platform",
+                "company": "OpsSight Demo",
+                "location": "Virtual"
+            }
+            
+            demo_user = await user_repository.create(demo_user_data)
+        
+        # Update last login
+        await user_repository.update_last_login(demo_user.id)
+        
+        # Create access token
+        access_token_expires = timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": str(demo_user.id)}, expires_delta=access_token_expires
+        )
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "expires_in": settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            "user": {
+                "id": str(demo_user.id),
+                "email": demo_user.email,
+                "full_name": demo_user.full_name,
+                "avatar_url": demo_user.avatar_url,
+                "is_active": demo_user.is_active
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Demo token generation failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Demo token generation failed"
+        )

@@ -30,17 +30,18 @@ services:
       - frontend-net
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_BASE_URL=http://backend:8000/api/v1
-      - NEXT_PUBLIC_WS_BASE_URL=ws://backend:8000
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
+      - NEXT_PUBLIC_WS_BASE_URL=ws://localhost:8000
+      - API_BASE_URL=http://backend:8000/api/v1
       - NEXT_PUBLIC_APP_VERSION=2.0.0
       - NEXT_PUBLIC_ENABLE_REAL_TIME=true
       - NEXT_PUBLIC_ENABLE_CACHE_METRICS=true
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 40s
     deploy:
       resources:
         limits:
@@ -51,7 +52,7 @@ services:
           memory: 256M
     depends_on:
       backend:
-        condition: service_healthy
+        condition: service_started
 
   # Backend API service
   # Reason: Application logic container with proper security and monitoring
@@ -67,26 +68,38 @@ services:
       - /app/.pytest_cache
     ports:
       - "8000:8000"
-      - "9090:9090"  # Expose Prometheus metrics port
+      - "8001:8001"  # Expose backend metrics port
     networks:
       - backend-net
       - frontend-net
       - database-net
       - monitor-net
     environment:
+      - DEBUG=True
+      - APP_NAME=OpsSight Docker
+      - APP_ENV=development
+      - SECRET_KEY=docker-secret-key-change-in-production
+      - GITHUB_CLIENT_ID=docker-client-id
+      - GITHUB_CLIENT_SECRET=docker-client-secret
+      - GITHUB_CALLBACK_URL=http://localhost:8000/auth/callback
+      - JWT_SECRET_KEY=docker-jwt-secret-key-that-is-at-least-32-characters-long
+      - JWT_ALGORITHM=HS256
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
+      - CSRF_SECRET=docker-csrf-secret
       - ENVIRONMENT=development
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/opsight
       - REDIS_URL=redis://redis:6379/0
       - CORS_ORIGINS=http://localhost:3000
       - PROMETHEUS_MULTIPROC_DIR=/tmp/metrics
-      - PROMETHEUS_METRICS_PORT=9090
-      - WORKERS=4
+      - PROMETHEUS_METRICS_PORT=8001
+      - WORKERS=1
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 60s
     deploy:
       resources:
         limits:

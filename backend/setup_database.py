@@ -252,7 +252,7 @@ async def create_sample_data(org_id: uuid.UUID):
                     'threshold_operator': '>',
                     'first_seen': datetime.utcnow() - timedelta(minutes=15),
                     'last_seen': datetime.utcnow(),
-                    'metadata': {'instance': 'frontend-01', 'cluster': 'production'}
+                    'alert_metadata': {'instance': 'frontend-01', 'cluster': 'production'}
                 },
                 {
                     'organization_id': org_id,
@@ -267,7 +267,7 @@ async def create_sample_data(org_id: uuid.UUID):
                     'first_seen': datetime.utcnow() - timedelta(hours=2),
                     'last_seen': datetime.utcnow() - timedelta(minutes=30),
                     'acknowledged_at': datetime.utcnow() - timedelta(minutes=45),
-                    'metadata': {'load_balancer': 'nginx-prod', 'upstream_errors': 3}
+                    'alert_metadata': {'load_balancer': 'nginx-prod', 'upstream_errors': 3}
                 },
                 {
                     'organization_id': org_id,
@@ -286,7 +286,7 @@ async def create_sample_data(org_id: uuid.UUID):
                     'first_seen': datetime.utcnow() - timedelta(hours=4),
                     'last_seen': datetime.utcnow() - timedelta(hours=3),
                     'resolved_at': datetime.utcnow() - timedelta(hours=3),
-                    'metadata': {'endpoint': '/api/v1/metrics', 'method': 'GET'}
+                    'alert_metadata': {'endpoint': '/api/v1/metrics', 'method': 'GET'}
                 }
             ]
             

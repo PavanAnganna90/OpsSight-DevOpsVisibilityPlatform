@@ -130,3 +130,30 @@ export function ResourceGuard({
     </PermissionGuard>
   );
 }
+
+// Team-specific guard component
+export function TeamGuard({
+  teamId,
+  permission,
+  role,
+  children,
+  fallback = null,
+}: {
+  teamId?: string;
+  permission?: string;
+  role?: string;
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
+}) {
+  return (
+    <PermissionGuard
+      permission={permission}
+      role={role}
+      resource="team"
+      organizationId={teamId}
+      fallback={fallback}
+    >
+      {children}
+    </PermissionGuard>
+  );
+}

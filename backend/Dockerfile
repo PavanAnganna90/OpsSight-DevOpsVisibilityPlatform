@@ -1,20 +1,6 @@
-# Multi-stage build for FastAPI backend following Context7 best practices
+# Production-ready FastAPI backend Dockerfile
+# Uses requirements.txt instead of Poetry for simpler builds
 
-# Stage 1: Build stage for dependencies
-FROM python:3.11-slim as requirements-stage
-
-WORKDIR /tmp
-
-# Install Poetry for dependency management
-RUN pip install poetry
-
-# Copy dependency files
-COPY ./pyproject.toml ./poetry.lock* /tmp/
-
-# Export dependencies to requirements.txt (without Poetry in final image)
-RUN poetry export -f requirements.txt --output requirements.txt --without-hashes
-
-# Stage 2: Production stage
 FROM python:3.11-slim
 
 # Set environment variables
@@ -38,27 +24,35 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 # Set working directory
 WORKDIR /code
 
-# Copy requirements from build stage
-COPY --from=requirements-stage /tmp/requirements.txt /code/requirements.txt
+# Copy minimal requirements file (no dependency conflicts)
+COPY ./requirements-minimal.txt /code/requirements.txt
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
 # Copy application code
 COPY ./app /code/app
+COPY ./setup_database.py /code/
+COPY ./database.py /code/
+COPY ./alembic.ini /code/
+COPY ./alembic /code/alembic
+COPY ./alembic_migrations /code/alembic_migrations
+
+# Create metrics directory for Prometheus
+RUN mkdir -p /tmp/metrics
 
 # Change ownership to non-root user
-RUN chown -R appuser:appuser /code
+RUN chown -R appuser:appuser /code /tmp/metrics
 
 # Switch to non-root user
 USER appuser
 
 # Add health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
 # Expose port
 EXPOSE 8000
 
 # Use exec form for proper signal handling with uvicorn for production
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"] 
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]

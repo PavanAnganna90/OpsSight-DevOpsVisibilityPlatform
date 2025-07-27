@@ -1,4 +1,20 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+
 export default function UltraMinimalPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // For development, bypass authentication and go directly to dashboard
+    const timer = setTimeout(() => {
+      router.push('/dashboard/enhanced');
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [router]);
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -69,6 +85,14 @@ export default function UltraMinimalPage() {
           <p style={{ color: '#6b7280', fontSize: '14px' }}>
             All services deployed successfully
           </p>
+          <div style={{ 
+            marginTop: '16px',
+            animation: 'pulse 2s infinite'
+          }}>
+            <p style={{ color: '#059669', fontSize: '14px', fontWeight: 'bold' }}>
+              🚀 Redirecting to Dashboard...
+            </p>
+          </div>
         </div>
       </div>
     </div>

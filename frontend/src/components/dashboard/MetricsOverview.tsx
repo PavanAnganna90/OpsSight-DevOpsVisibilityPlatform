@@ -18,8 +18,8 @@ import {
   XCircle,
   AlertCircle
 } from 'lucide-react';
-import { cn } from '@/utils/cn';
-import { useMetrics } from '@/hooks/useMetrics';
+import { cn } from '@/lib/utils';
+import { useDashboardMetrics } from '@/hooks/useMetrics';
 import { apiService } from '@/services/apiService';
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
 
@@ -40,7 +40,7 @@ interface SystemMetrics {
 }
 
 export function MetricsOverview() {
-  const { data: metrics, loading } = useMetrics();
+  const { data: metrics, isLoading: loading } = useDashboardMetrics();
   const [dashboardMetrics, setDashboardMetrics] = React.useState<any>(null);
   const [cacheMetrics, setCacheMetrics] = React.useState<any>(null);
   const [apiPerformance, setApiPerformance] = React.useState<any>(null);
@@ -159,7 +159,7 @@ export function MetricsOverview() {
   return (
     <div className="space-y-6">
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {metricCards.map((metric) => (
           <MetricCard
             key={metric.title}
@@ -239,7 +239,7 @@ export function MetricsOverview() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <QuickStat 
           label="Uptime"
           value="99.98%"
@@ -334,7 +334,7 @@ function calculateChange(metric: MetricData): string {
 function MetricsOverviewSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {[...Array(4)].map((_, i) => (
           <LoadingSkeleton key={i} variant="metric" />
         ))}

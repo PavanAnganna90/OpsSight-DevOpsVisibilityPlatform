@@ -519,11 +519,11 @@ if CELERY_AVAILABLE:
     def send_push_notification_task(self, user_id: int, notification_data: dict):
         """Celery task for sending push notifications in background."""
         import asyncio
-        from app.db.database import get_async_session
+        from app.db.database import get_async_db
         
         async def _send_notification():
             push_service = PushNotificationService()
-            async with get_async_session() as db:
+            async with get_async_db() as db:
                 await push_service.send_to_user(
                     db=db,
                     user_id=user_id,
@@ -538,11 +538,11 @@ else:
     def send_push_notification_task(self, user_id: int, notification_data: dict):
         """Celery task for sending push notifications in background."""
         import asyncio
-        from app.db.database import get_async_session
+        from app.db.database import get_async_db
         
         async def _send_notification():
             push_service = PushNotificationService()
-            async with get_async_session() as db:
+            async with get_async_db() as db:
                 notification = PushNotificationData(**notification_data)
                 result = await push_service.send_to_user(db, user_id, notification)
                 return result
@@ -562,11 +562,11 @@ if CELERY_AVAILABLE:
     def cleanup_inactive_tokens_task(self):
         """Celery task to clean up inactive push tokens."""
         import asyncio
-        from app.db.database import get_async_session
+        from app.db.database import get_async_db
         
         async def _cleanup():
             push_service = PushNotificationService()
-            async with get_async_session() as db:
+            async with get_async_db() as db:
                 return await push_service.cleanup_inactive_tokens(db)
         
         try:
@@ -581,10 +581,10 @@ else:
     def cleanup_inactive_tokens_task(self):
         """Celery task to clean up inactive push tokens."""
         import asyncio
-        from app.db.database import get_async_session
+        from app.db.database import get_async_db
         
         async def _cleanup_tokens():
-            async with get_async_session() as db:
+            async with get_async_db() as db:
                 # Remove tokens that haven't been used in 30 days and have high failure count
                 cutoff_date = datetime.utcnow() - timedelta(days=30)
                 

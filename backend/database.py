@@ -34,7 +34,6 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, selectinload
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ENUM
 from sqlalchemy.sql import select, insert, update, delete
-from sqlalchemy.pool import QueuePool
 import asyncpg
 
 # Encryption for sensitive data
@@ -45,30 +44,35 @@ import bcrypt
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Database configuration
-DATABASE_CONFIG = {
-    'host': os.getenv('DB_HOST', 'localhost'),
-    'port': int(os.getenv('DB_PORT', '5432')),
-    'database': os.getenv('DB_NAME', 'opssight'),
-    'username': os.getenv('DB_USER', 'opssight'),
-    'password': os.getenv('DB_PASSWORD', 'opssight123'),
+# Database configuration - use DATABASE_URL from environment if available
+if 'DATABASE_URL' in os.environ:
+    DATABASE_URL = os.getenv('DATABASE_URL').replace('postgresql://', 'postgresql+asyncpg://')
+else:
+    # Fallback to individual environment variables
+    DATABASE_CONFIG = {
+        'host': os.getenv('DB_HOST', 'localhost'),
+        'port': int(os.getenv('DB_PORT', '5432')),
+        'database': os.getenv('DB_NAME', 'opssight'),
+        'username': os.getenv('DB_USER', 'opssight'),
+        'password': os.getenv('DB_PASSWORD', 'opssight123'),
+    }
+    DATABASE_URL = f"postgresql+asyncpg://{DATABASE_CONFIG['username']}:{DATABASE_CONFIG['password']}@{DATABASE_CONFIG['host']}:{DATABASE_CONFIG['port']}/{DATABASE_CONFIG['database']}"
+
+# Connection pool configuration
+DATABASE_POOL_CONFIG = {
     'pool_size': int(os.getenv('DB_POOL_SIZE', '20')),
     'max_overflow': int(os.getenv('DB_MAX_OVERFLOW', '30')),
     'pool_timeout': int(os.getenv('DB_POOL_TIMEOUT', '30')),
     'pool_recycle': int(os.getenv('DB_POOL_RECYCLE', '3600')),
 }
 
-# Database URL
-DATABASE_URL = f"postgresql+asyncpg://{DATABASE_CONFIG['username']}:{DATABASE_CONFIG['password']}@{DATABASE_CONFIG['host']}:{DATABASE_CONFIG['port']}/{DATABASE_CONFIG['database']}"
-
 # Create async engine
 engine = create_async_engine(
     DATABASE_URL,
-    poolclass=QueuePool,
-    pool_size=DATABASE_CONFIG['pool_size'],
-    max_overflow=DATABASE_CONFIG['max_overflow'],
-    pool_timeout=DATABASE_CONFIG['pool_timeout'],
-    pool_recycle=DATABASE_CONFIG['pool_recycle'],
+    pool_size=DATABASE_POOL_CONFIG['pool_size'],
+    max_overflow=DATABASE_POOL_CONFIG['max_overflow'],
+    pool_timeout=DATABASE_POOL_CONFIG['pool_timeout'],
+    pool_recycle=DATABASE_POOL_CONFIG['pool_recycle'],
     echo=bool(os.getenv('DB_ECHO', False)),  # Set to True for SQL logging
     future=True
 )
@@ -314,7 +318,7 @@ class Alert(Base):
     assigned_to = Column(UUID(as_uuid=True), ForeignKey('users.id'))
     
     # Additional data
-    metadata = Column(JSONB, default={})
+    alert_metadata = Column(JSONB, default={})
     runbook_url = Column(String(500))
     
     # Relationships
@@ -400,7 +404,7 @@ class AuditLog(Base):
     new_values = Column(JSONB)
     
     # Metadata
-    metadata = Column(JSONB, default={})
+    audit_metadata = Column(JSONB, default={})
     
     # Timing
     timestamp = Column(DateTime, nullable=False, default=datetime.utcnow)

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_, desc
 from pydantic import BaseModel, Field
 
-from app.db.database import get_async_session
+from app.db.database import get_async_db
 from app.core.auth import get_current_user
 from app.models.user import User
 from app.models.team import Team, TeamMember
@@ -111,7 +111,7 @@ async def get_team_dashboard(
     request: Request,
     period_days: int = Query(30, ge=1, le=365, description="Period for metrics in days"),
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_db)
 ):
     """Get comprehensive team dashboard data."""
     
@@ -521,7 +521,7 @@ async def get_team_activity_feed(
     offset: int = Query(0, ge=0, description="Offset for pagination"),
     activity_types: Optional[str] = Query(None, description="Comma-separated activity types"),
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_db)
 ):
     """Get real-time activity feed for the team."""
     
@@ -582,7 +582,7 @@ async def get_team_metrics_trends(
     metric_type: str = Query(..., description="Type of metric (activity, performance, resources)"),
     period: str = Query("7d", pattern="^(1d|7d|30d|90d)$", description="Time period"),
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_async_session)
+    session: AsyncSession = Depends(get_async_db)
 ):
     """Get team metrics trends over time."""
     

@@ -397,7 +397,7 @@ class SchemaManager:
             Dict: Table statistics including row counts and sizes
         """
         try:
-            async with get_async_session() as session:
+            async with get_async_db() as session:
                 # Get table information
                 result = await session.execute(
                     text(

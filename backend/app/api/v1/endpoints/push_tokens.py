@@ -10,7 +10,7 @@ from sqlalchemy.future import select
 from sqlalchemy import and_
 
 from app.core.auth import get_current_user
-from app.db.database import get_async_session
+from app.db.database import get_async_db
 from app.models.user import User
 from app.models.push_token import PushToken
 from app.services.push_notification_service import push_notification_service
@@ -28,7 +28,7 @@ router = APIRouter()
 @router.post("/", response_model=PushTokenResponse, status_code=status.HTTP_201_CREATED)
 async def register_push_token(
     token_data: PushTokenCreate,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ) -> PushTokenResponse:
     """
@@ -76,7 +76,7 @@ async def register_push_token(
 
 @router.get("/", response_model=PushTokenList)
 async def get_user_push_tokens(
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ) -> PushTokenList:
     """Get all push tokens for the current user."""
@@ -104,7 +104,7 @@ async def get_user_push_tokens(
 @router.delete("/{token_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_push_token(
     token_id: int,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ) -> None:
     """Delete a specific push token."""
@@ -142,7 +142,7 @@ async def delete_push_token(
 @router.post("/{token_id}/deactivate", response_model=PushTokenResponse)
 async def deactivate_push_token(
     token_id: int,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ) -> PushTokenResponse:
     """Deactivate a specific push token."""
@@ -182,7 +182,7 @@ async def deactivate_push_token(
 @router.post("/{token_id}/reactivate", response_model=PushTokenResponse)
 async def reactivate_push_token(
     token_id: int,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ) -> PushTokenResponse:
     """Reactivate a specific push token."""
@@ -222,7 +222,7 @@ async def reactivate_push_token(
 @router.post("/test", response_model=TestNotificationResponse)
 async def send_test_notification(
     test_request: TestNotificationRequest,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ) -> TestNotificationResponse:
     """Send a test push notification to the current user's devices."""
@@ -265,7 +265,7 @@ async def send_test_notification(
 
 @router.get("/stats", response_model=Dict[str, Any])
 async def get_push_token_stats(
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """Get push token statistics for the current user."""

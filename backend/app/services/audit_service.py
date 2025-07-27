@@ -21,7 +21,7 @@ from app.models.audit_log import (
     AuditLogLevel
 )
 from app.models.user import User
-from app.db.database import get_async_session
+from app.db.database import get_async_db
 from app.core.config import settings
 
 
@@ -555,7 +555,7 @@ class AuditService:
 @asynccontextmanager
 async def get_audit_service():
     """Context manager for audit service."""
-    async with get_async_session() as session:
+    async with get_async_db() as session:
         yield AuditService(session)
 
 

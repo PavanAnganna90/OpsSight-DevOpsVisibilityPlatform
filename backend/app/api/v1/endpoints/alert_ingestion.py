@@ -352,7 +352,7 @@ async def get_ingestion_health(
     """Health check for alert ingestion service"""
     try:
         # Test database connection
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         
         # Test cache connection
         await cache.set("health_check", "ok", ttl=10)

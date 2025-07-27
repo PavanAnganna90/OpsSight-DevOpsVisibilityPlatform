@@ -1,8 +1,21 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { DashboardShell } from '@/components/dashboard/DashboardShell';
-import { MetricsOverview } from '@/components/dashboard/MetricsOverview';
+// Dynamically import to prevent SSR issues
+const MetricsOverview = dynamic(() => import('@/components/dashboard/MetricsOverview').then(mod => ({ default: mod.MetricsOverview })), { 
+  ssr: false,
+  loading: () => <div className="h-48 animate-pulse bg-gray-200 rounded-lg" />
+});
+const PerformanceMetrics = dynamic(() => import('@/components/Dashboard/PerformanceMetrics').then(mod => ({ default: mod.PerformanceMetrics })), { 
+  ssr: false,
+  loading: () => <div className="h-64 animate-pulse bg-gray-200 rounded-lg" />
+});
+const InfrastructureView = dynamic(() => import('@/components/Dashboard/InfrastructureView').then(mod => ({ default: mod.InfrastructureView })), { 
+  ssr: false,
+  loading: () => <div className="h-64 animate-pulse bg-gray-200 rounded-lg" />
+});
 import { PipelineStatus } from '@/components/dashboard/PipelineStatus';
 import { RealTimeAlertsPanel } from '@/components/dashboard/RealTimeAlertsPanel';
 import { ResourceMonitor } from '@/components/dashboard/ResourceMonitor';
@@ -15,7 +28,9 @@ import {
   AlertCircle, 
   Server, 
   Activity,
-  BarChart3
+  BarChart3,
+  TrendingUp,
+  Zap
 } from 'lucide-react';
 
 export default function EnhancedDashboardPage() {
@@ -32,10 +47,18 @@ export default function EnhancedDashboardPage() {
 
         {/* Main Dashboard Content */}
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid grid-cols-6 w-full max-w-3xl">
+          <TabsList className="grid grid-cols-2 lg:grid-cols-7 w-full max-w-4xl">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <LayoutDashboard className="h-4 w-4" />
               Overview
+            </TabsTrigger>
+            <TabsTrigger value="performance" className="flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              Performance
+            </TabsTrigger>
+            <TabsTrigger value="infrastructure" className="flex items-center gap-2">
+              <Server className="h-4 w-4" />
+              Infrastructure
             </TabsTrigger>
             <TabsTrigger value="pipelines" className="flex items-center gap-2">
               <GitBranch className="h-4 w-4" />
@@ -44,10 +67,6 @@ export default function EnhancedDashboardPage() {
             <TabsTrigger value="alerts" className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4" />
               Alerts
-            </TabsTrigger>
-            <TabsTrigger value="resources" className="flex items-center gap-2">
-              <Server className="h-4 w-4" />
-              Resources
             </TabsTrigger>
             <TabsTrigger value="activity" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
@@ -90,16 +109,20 @@ export default function EnhancedDashboardPage() {
             </div>
           </TabsContent>
 
+          <TabsContent value="performance" className="space-y-6">
+            <PerformanceMetrics />
+          </TabsContent>
+
+          <TabsContent value="infrastructure" className="space-y-6">
+            <InfrastructureView />
+          </TabsContent>
+
           <TabsContent value="pipelines" className="space-y-6">
             <PipelineStatus />
           </TabsContent>
 
           <TabsContent value="alerts" className="space-y-6">
             <RealTimeAlertsPanel />
-          </TabsContent>
-
-          <TabsContent value="resources" className="space-y-6">
-            <ResourceMonitor />
           </TabsContent>
 
           <TabsContent value="activity" className="space-y-6">
@@ -192,7 +215,7 @@ function AnalyticsDashboard() {
         <p className="text-muted-foreground">Performance metrics and trends</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Deployment Frequency</CardTitle>

@@ -49,7 +49,9 @@ class RBACMiddleware(BaseHTTPMiddleware):
         self.public_endpoints = {
             "/docs", "/redoc", "/openapi.json", "/health", "/metrics",
             "/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/callback",
-            "/api/v1/auth/refresh", "/api/v1/auth/me", "/favicon.ico"
+            "/api/v1/auth/refresh", "/api/v1/auth/me", "/favicon.ico",
+            # Direct auth endpoints for frontend compatibility
+            "/auth/demo-token", "/auth/github", "/auth/github/callback"
         }
         # OAuth and SSO endpoint patterns that should be public
         self.public_endpoint_patterns = [
@@ -64,7 +66,11 @@ class RBACMiddleware(BaseHTTPMiddleware):
             # SAML endpoints
             r"^/api/v1/auth/saml/metadata$",
             r"^/api/v1/auth/saml/login$",
-            r"^/api/v1/auth/saml/acs$"
+            r"^/api/v1/auth/saml/acs$",
+            # Direct auth endpoints for frontend compatibility
+            r"^/auth/demo-token/?$",
+            r"^/auth/github/?$",
+            r"^/auth/github/callback/?$"
         ]
         self.rate_limit_cache = {}
         self.max_requests_per_minute = 100
@@ -249,13 +255,17 @@ class RBACMiddleware(BaseHTTPMiddleware):
     
     def _is_public_endpoint(self, path: str) -> bool:
         """Check if endpoint is public and should bypass RBAC."""
-        # Check exact matches
-        if any(path.startswith(endpoint) for endpoint in self.public_endpoints):
-            return True
+        # Normalize path by removing trailing slash for comparison
+        normalized_path = path.rstrip('/')
+        
+        # Check exact matches (with and without trailing slash)
+        for endpoint in self.public_endpoints:
+            if path == endpoint or normalized_path == endpoint or path.startswith(endpoint + '/'):
+                return True
         
         # Check pattern matches for OAuth endpoints
         for pattern in self.public_endpoint_patterns:
-            if re.match(pattern, path):
+            if re.match(pattern, path) or re.match(pattern, normalized_path):
                 return True
         
         return False

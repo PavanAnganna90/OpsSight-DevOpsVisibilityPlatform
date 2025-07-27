@@ -1,75 +1,133 @@
 # Production environment values for opsight
 # Reason: High-availability and performance optimized configuration for production
 
+# Global configuration
+global:
+  imageRegistry: "ghcr.io"
+  imagePullSecrets: 
+    - name: ghcr-secret
+  storageClass: "gp3"
+
 # Application settings
 app:
+  name: opsight
+  version: "1.0.0"
   environment: production
 
 # Frontend configuration - production-ready with high availability
 frontend:
+  enabled: true
+  name: frontend
+  image:
+    repository: ghcr.io/your-org/opsight-frontend
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
   replicaCount: 3
-  image:
-    tag: "latest"
-  resources:
-    limits:
-      cpu: 1000m
-      memory: 1Gi
-    requests:
-      cpu: 250m
-      memory: 256Mi
-  autoscaling:
-    enabled: true
-    minReplicas: 3
-    maxReplicas: 15
-    targetCPUUtilizationPercentage: 60
-    targetMemoryUtilizationPercentage: 70
-  env:
-    NODE_ENV: production
-    NEXT_PUBLIC_API_URL: https://api.opsight.com
-
-# Backend configuration - production-ready with high availability
-backend:
-  replicaCount: 5
-  image:
-    tag: "latest"
+  service:
+    type: ClusterIP
+    port: 3000
+    targetPort: 3000
   resources:
     limits:
       cpu: 2000m
-      memory: 3Gi
+      memory: 2Gi
     requests:
       cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  env:
+    NODE_ENV: production
+    NEXT_PUBLIC_APP_VERSION: "1.0.0"
+    NEXT_TELEMETRY_DISABLED: "1"
+    NEXT_PUBLIC_API_URL: https://api.opssight.dev
+
+# Backend configuration - production-ready with high availability
+backend:
+  enabled: true
+  name: backend
+  image:
+    repository: ghcr.io/your-org/opsight-backend
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 5
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+    metricsPort: 9090
+  resources:
+    limits:
+      cpu: 3000m
+      memory: 4Gi
+    requests:
+      cpu: 1000m
       memory: 1Gi
   autoscaling:
     enabled: true
     minReplicas: 5
-    maxReplicas: 25
-    targetCPUUtilizationPercentage: 60
-    targetMemoryUtilizationPercentage: 70
+    maxReplicas: 30
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
   env:
     ENVIRONMENT: production
     WORKERS: 8
+    PROMETHEUS_MULTIPROC_DIR: /tmp/metrics
+    PROMETHEUS_METRICS_PORT: 9090
 
-# Database configuration - production-ready with higher resources
+# Database configuration (External RDS)
 postgresql:
-  primary:
-    persistence:
-      size: 100Gi
-      storageClass: gp3
-    resources:
-      limits:
-        cpu: 2000m
-        memory: 4Gi
-      requests:
-        cpu: 1000m
-        memory: 2Gi
+  enabled: false  # Using external RDS
+
+# External database connection
+externalDatabase:
+  enabled: true
+  type: postgresql
+  host: "opsight-production-db.cluster-xyz.us-east-1.rds.amazonaws.com"
+  port: 5432
+  database: "opsight"
+  username: "opsight_user"
+  existingSecret: "opsight-db-secret"
+  existingSecretKey: "postgres-password"
+
+# Redis configuration (External ElastiCache)
+redis:
+  enabled: false  # Using external ElastiCache
+
+externalRedis:
+  enabled: true
+  host: "opsight-production-redis.xyz.cache.amazonaws.com"
+  port: 6379
+  auth:
+    enabled: true
+    existingSecret: "opsight-redis-secret"
+    existingSecretKey: "redis-password"
 
 # Ingress configuration for production
 ingress:
+  enabled: true
+  className: alb
   annotations:
-    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-west-2:ACCOUNT:certificate/CERT-ID
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:123456789012:certificate/xyz"
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=60
     alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS-1-2-2017-01
   hosts:
-    - host: opsight.com
+    - host: opssight.dev
       paths:
         - path: /
           pathType: Prefix
@@ -80,30 +138,42 @@ ingress:
   tls:
     - secretName: opsight-production-tls
       hosts:
-        - opsight.com
+        - opssight.dev
 
 # Monitoring configuration - production-ready with extended retention
 monitoring:
+  enabled: true
   prometheus:
+    enabled: true
     server:
       retention: "30d"
       resources:
         limits:
           cpu: 2000m
-          memory: 4Gi
+          memory: 8Gi
         requests:
           cpu: 1000m
-          memory: 2Gi
+          memory: 4Gi
+      persistentVolume:
+        enabled: true
+        size: 100Gi
+        storageClass: gp3
   grafana:
-    adminPassword: "" # Use external secret
+    enabled: true
+    adminPassword: "ChangeMeInProduction!"
     resources:
       limits:
         cpu: 1000m
-        memory: 1Gi
+        memory: 2Gi
       requests:
-        cpu: 200m
-        memory: 256Mi
+        cpu: 250m
+        memory: 512Mi
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: gp3
   alertmanager:
+    enabled: true
     resources:
       limits:
         cpu: 200m
@@ -111,6 +181,64 @@ monitoring:
       requests:
         cpu: 100m
         memory: 128Mi
+
+# Pod Disruption Budgets
+podDisruptionBudget:
+  enabled: true
+  frontend:
+    minAvailable: 2
+  backend:
+    minAvailable: 3
+
+# Network Policies
+networkPolicies:
+  enabled: true
+  ingress:
+    enabled: true
+  egress:
+    enabled: true
+
+# Security Policies
+securityPolicies:
+  enabled: true
+  podSecurityStandards: restricted
+
+# ServiceAccount configuration
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/opsight-production-service-account"
+  name: "opsight-service-account"
+
+# RBAC configuration
+rbac:
+  create: true
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+  seccompProfile:
+    type: RuntimeDefault
+
+# Security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1001
+  capabilities:
+    drop:
+    - ALL
+
+# Node selector for production workloads
+nodeSelector:
+  kubernetes.io/os: linux
+  node.kubernetes.io/instance-type: "t3.large"
+
+# Tolerations for production nodes
+tolerations: []
 
 # Production affinity rules for high availability
 affinity:
@@ -124,4 +252,43 @@ affinity:
             operator: In
             values:
             - opsight
-        topologyKey: kubernetes.io/hostname 
+        topologyKey: kubernetes.io/hostname
+
+# Backup Configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: "30d"
+  storageClass: "gp3"
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+# Secrets Management Configuration
+secretsManagement:
+  enabled: true
+  provider: aws
+  serviceAccountName: secrets-manager-sa
+  region: us-east-1
+  secretProviderClasses:
+    application: opsight-application-secrets
+    database: opsight-database-secrets
+    monitoring: opsight-monitoring-secrets
+  awsSecretsManager:
+    applicationSecretsName: "opsight-production-application-secrets"
+    databaseSecretsName: "opsight-production-database-secrets"
+    monitoringSecretsName: "opsight-production-monitoring-secrets"
+    cicdSecretsName: "opsight-production-cicd-secrets"
+  mountPath: "/mnt/secrets-store"
+  rotation:
+    enabled: true
+    pollInterval: "2m"
+  networkPolicies:
+    enabled: true
+  podAnnotations:
+    secrets.opsight.io/access: "true"
+    secrets.opsight.io/provider: "aws" 

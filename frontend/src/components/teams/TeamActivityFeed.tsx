@@ -16,7 +16,7 @@ import {
   ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/Select';
 import { TextField } from '@/components/ui/TextField';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';

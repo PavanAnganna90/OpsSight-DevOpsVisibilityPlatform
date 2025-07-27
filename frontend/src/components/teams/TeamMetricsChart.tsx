@@ -23,7 +23,7 @@ import {
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 
 interface MetricDataPoint {
   date: string;
