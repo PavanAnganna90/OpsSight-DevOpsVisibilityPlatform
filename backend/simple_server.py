@@ -104,6 +104,34 @@ async def get_deployments():
         }
     ]
 
+@app.get("/cache/metrics")
+async def get_cache_metrics():
+    """Mock cache metrics endpoint for frontend"""
+    return {
+        "hit_rate": 0.85,
+        "miss_rate": 0.15,
+        "total_requests": 15423,
+        "cache_size": "256MB",
+        "eviction_count": 42,
+        "avg_response_time": "2.3ms",
+        "timestamp": datetime.utcnow().isoformat(),
+        "mode": "simple"
+    }
+
+@app.get("/api/performance")
+async def get_api_performance():
+    """Mock API performance endpoint for frontend"""
+    return {
+        "avg_response_time": 145.2,
+        "p95_response_time": 287.5,
+        "p99_response_time": 421.8,
+        "requests_per_second": 342.7,
+        "error_rate": 0.023,
+        "active_connections": 1842,
+        "timestamp": datetime.utcnow().isoformat(),
+        "mode": "simple"
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

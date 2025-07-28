@@ -4,9 +4,9 @@ import React, { Suspense } from 'react';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import { MonitoringProvider } from '@/components/providers/MonitoringProvider';
 import { SecurityProvider } from '@/components/providers/SecurityProvider';
-import { DevAuthProvider } from '@/contexts/DevAuthContext';
+import { AuthProvider } from '@/contexts/DashboardAuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
-import { ToastProvider } from '@/components/ui/Toast';
+import { ToastProvider } from '@/components/ui/toast';
 import { ServiceWorkerProvider } from '@/components/providers/ServiceWorkerProvider';
 import { TeamProvider } from '@/contexts/TeamContext';
 import { SettingsProvider } from '@/contexts/SettingsContext';
@@ -23,7 +23,7 @@ import { SettingsProvider } from '@/contexts/SettingsContext';
  * 1. QueryProvider - Data fetching foundation
  * 2. MonitoringProvider - Performance & error tracking
  * 3. SecurityProvider - CSRF, XSS protection
- * 4. DevAuthProvider - Development authentication state (bypasses SSO)
+ * 4. AuthProvider - Enterprise authentication state (with auth bypass for dev)
  * 5. TeamProvider - Team context (depends on auth)
  * 6. ThemeProvider - Visual theming
  * 7. SettingsProvider - User preferences
@@ -53,7 +53,7 @@ export function ProvidersWrapper({ children }: ProvidersWrapperProps) {
       <QueryProvider>
         <MonitoringProvider>
           <SecurityProvider>
-            <DevAuthProvider>
+            <AuthProvider>
               <TeamProvider>
                 <ThemeProvider>
                   <SettingsProvider>
@@ -65,7 +65,7 @@ export function ProvidersWrapper({ children }: ProvidersWrapperProps) {
                   </SettingsProvider>
                 </ThemeProvider>
               </TeamProvider>
-            </DevAuthProvider>
+            </AuthProvider>
           </SecurityProvider>
         </MonitoringProvider>
       </QueryProvider>

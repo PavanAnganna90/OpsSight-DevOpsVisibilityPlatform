@@ -1,6 +1,24 @@
 # OpsSight DevOps Visibility Platform
 
+[![CI/CD Pipeline](https://github.com/pavan-official/Devops-app-dev-cursor/actions/workflows/enhanced-ci-cd.yml/badge.svg)](https://github.com/pavan-official/Devops-app-dev-cursor/actions/workflows/enhanced-ci-cd.yml)
+[![Security Scan](https://github.com/pavan-official/Devops-app-dev-cursor/actions/workflows/security-scan.yml/badge.svg)](https://github.com/pavan-official/Devops-app-dev-cursor/actions/workflows/security-scan.yml)
+[![Coverage](https://codecov.io/gh/pavan-official/Devops-app-dev-cursor/branch/main/graph/badge.svg)](https://codecov.io/gh/pavan-official/Devops-app-dev-cursor)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
+[![Discord](https://img.shields.io/discord/YOUR_DISCORD_ID?color=7289da&label=Discord&logo=discord)](https://discord.gg/opssight)
+
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19-blue?logo=react)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Latest-green?logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue?logo=docker)](https://www.docker.com/)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-blue?logo=kubernetes)](https://kubernetes.io/)
+
 A comprehensive DevOps visibility platform that provides real-time insights into CI/CD pipelines, infrastructure health, and development workflows. OpsSight combines a modern, accessible theme system with powerful monitoring capabilities to create a unified dashboard for DevOps teams.
+
+## ⭐ Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=pavan-official/Devops-app-dev-cursor&type=Date)](https://star-history.com/#pavan-official/Devops-app-dev-cursor&Date)
 
 ## 🚀 Features
 
@@ -308,7 +326,15 @@ See [Theme Customization Guide](docs/theme-system.md#customization) for detailed
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+We welcome contributions from the community! Whether you're fixing bugs, adding features, improving documentation, or helping with translations, your contributions make OpsSight better for everyone.
+
+### Quick Start for Contributors
+
+1. **⭐ Star the repository** to show your support
+2. **🍴 Fork the repository** and clone your fork
+3. **📖 Read our [Contributing Guide](CONTRIBUTING.md)** for detailed guidelines
+4. **🏷️ Check [Good First Issues](https://github.com/pavan-official/Devops-app-dev-cursor/labels/good%20first%20issue)** for beginner-friendly tasks
+5. **💬 Join our [Discord](https://discord.gg/opssight)** to discuss ideas and get help
 
 ### Development Workflow
 
@@ -320,26 +346,146 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 6. Push to the branch: `git push origin feature/amazing-feature`
 7. Open a Pull Request
 
+### Ways to Contribute
+
+- 🐛 **Report Bugs**: Use our [bug report template](.github/ISSUE_TEMPLATE/bug_report.yml)
+- ✨ **Request Features**: Use our [feature request template](.github/ISSUE_TEMPLATE/feature_request.yml)
+- 📝 **Improve Documentation**: Help make our docs even better
+- 🧪 **Add Tests**: Increase test coverage and reliability
+- 🌍 **Translations**: Help make OpsSight accessible globally
+- 🎨 **UI/UX**: Improve the user experience and design
+
 ### Code Standards
 
-- Follow TypeScript best practices
-- Write comprehensive tests for new features
+- Follow TypeScript best practices with strict mode
+- Write comprehensive tests (aim for >80% coverage)
 - Ensure accessibility compliance (WCAG 2.1 AA)
-- Document all public APIs with TSDoc
+- Document all public APIs with TSDoc comments
 - Follow the established file structure and naming conventions
+- Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages
+
+## 🏆 Contributors
+
+Thanks to all our amazing contributors! 🎉
+
+[![Contributors](https://contrib.rocks/image?repo=pavan-official/Devops-app-dev-cursor)](https://github.com/pavan-official/Devops-app-dev-cursor/graphs/contributors)
+
+## 💬 Community & Support
+
+### 🆘 Getting Help
+
+- 📚 **Documentation**: Check our [comprehensive docs](docs/)
+- 💬 **GitHub Discussions**: [Ask questions and share ideas](https://github.com/pavan-official/Devops-app-dev-cursor/discussions)
+- 🐛 **Bug Reports**: [Report issues using our templates](https://github.com/pavan-official/Devops-app-dev-cursor/issues)
+- 💬 **Discord**: [Join our community chat](https://discord.gg/opssight)
+- 📧 **Email**: [contact@opssight.dev](mailto:contact@opssight.dev)
+
+### 🌐 Community Channels
+
+- **Discord**: Real-time chat and support
+- **GitHub Discussions**: Longer-form discussions and Q&A
+- **Twitter**: [@OpsSightDev](https://twitter.com/OpsSightDev) - Updates and announcements
+- **LinkedIn**: [OpsSight Platform](https://linkedin.com/company/opssight) - Professional updates
+- **YouTube**: [OpsSight Channel](https://youtube.com/@opssight) - Tutorials and demos
+
+### 🔔 Stay Updated
+
+- ⭐ **Star this repository** to get notifications
+- 👀 **Watch releases** for new version notifications
+- 📧 **Subscribe to our newsletter** at [opssight.dev/newsletter](https://opssight.dev/newsletter)
+- 🐦 **Follow us on Twitter** [@OpsSightDev](https://twitter.com/OpsSightDev)
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+```
+MIT License
+
+Copyright (c) 2025 OpsSight DevOps Platform
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+```
+
 ## 🙏 Acknowledgments
 
-- Built with [Next.js](https://nextjs.org/) and [React](https://reactjs.org/)
-- UI components inspired by [Headless UI](https://headlessui.dev/)
-- Icons from [Heroicons](https://heroicons.com/)
-- Charts powered by [Recharts](https://recharts.org/)
-- Testing with [Jest](https://jestjs.io/) and [React Testing Library](https://testing-library.com/)
+We extend our gratitude to the amazing open-source community and the following projects that make OpsSight possible:
+
+### 🏗️ Core Technologies
+- **[Next.js](https://nextjs.org/)** - The React framework for production
+- **[React](https://reactjs.org/)** - A JavaScript library for building user interfaces
+- **[TypeScript](https://www.typescriptlang.org/)** - Typed JavaScript at any scale
+- **[FastAPI](https://fastapi.tiangolo.com/)** - Modern, fast web framework for Python
+- **[PostgreSQL](https://www.postgresql.org/)** - Advanced open source database
+- **[Redis](https://redis.io/)** - In-memory data structure store
+
+### 🎨 UI & Design
+- **[Tailwind CSS](https://tailwindcss.com/)** - Utility-first CSS framework
+- **[Headless UI](https://headlessui.dev/)** - Unstyled, accessible UI components
+- **[Heroicons](https://heroicons.com/)** - Beautiful hand-crafted SVG icons
+- **[Lucide React](https://lucide.dev/)** - Beautiful & consistent icon toolkit
+- **[Recharts](https://recharts.org/)** - Redefined chart library built with React
+
+### 🧪 Testing & Quality
+- **[Jest](https://jestjs.io/)** - Delightful JavaScript testing framework
+- **[React Testing Library](https://testing-library.com/)** - Testing utilities for React
+- **[Playwright](https://playwright.dev/)** - End-to-end testing framework
+- **[ESLint](https://eslint.org/)** - Find and fix problems in JavaScript code
+- **[Prettier](https://prettier.io/)** - Opinionated code formatter
+
+### 🔧 DevOps & Infrastructure
+- **[Docker](https://www.docker.com/)** - Containerization platform
+- **[Kubernetes](https://kubernetes.io/)** - Container orchestration system
+- **[Prometheus](https://prometheus.io/)** - Monitoring system & time series database
+- **[Grafana](https://grafana.com/)** - Open observability platform
+- **[GitHub Actions](https://github.com/features/actions)** - CI/CD platform
+
+### 🌟 Special Thanks
+- **Contributors**: All the amazing people who contribute code, documentation, and ideas
+- **Community**: Our Discord community for feedback and support
+- **Beta Testers**: Early adopters who help us improve the platform
+- **Open Source**: The entire open-source ecosystem that makes projects like this possible
+
+## 📊 Project Stats
+
+<!-- GitHub Stats -->
+![GitHub stars](https://img.shields.io/github/stars/pavan-official/Devops-app-dev-cursor?style=social)
+![GitHub forks](https://img.shields.io/github/forks/pavan-official/Devops-app-dev-cursor?style=social)
+![GitHub watchers](https://img.shields.io/github/watchers/pavan-official/Devops-app-dev-cursor?style=social)
+
+![GitHub issues](https://img.shields.io/github/issues/pavan-official/Devops-app-dev-cursor)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/pavan-official/Devops-app-dev-cursor)
+![GitHub last commit](https://img.shields.io/github/last-commit/pavan-official/Devops-app-dev-cursor)
+![GitHub contributors](https://img.shields.io/github/contributors/pavan-official/Devops-app-dev-cursor)
+
+## 🔗 Related Projects
+
+Check out these related projects in the DevOps ecosystem:
+
+- **[Backstage](https://backstage.io/)** - Open platform for building developer portals
+- **[Grafana](https://grafana.com/)** - Open source analytics & monitoring solution
+- **[Prometheus](https://prometheus.io/)** - Monitoring system & time series database
+- **[ArgoCD](https://argoproj.github.io/cd/)** - Declarative GitOps continuous delivery tool
+- **[Tekton](https://tekton.dev/)** - Cloud native solution for building CI/CD systems
 
 ---
 
-For more information, visit our [documentation](docs/) or check out the [live demo](https://opsight-demo.vercel.app). 
+<div align="center">
+
+### 🚀 Ready to get started?
+
+[**📖 Read the Docs**](docs/) • [**🎮 Try the Demo**](http://localhost:3000) • [**💬 Join Discord**](https://discord.gg/opssight) • [**🐦 Follow on Twitter**](https://twitter.com/OpsSightDev)
+
+**Made with ❤️ by the OpsSight team and contributors**
+
+⭐ **Star us on GitHub** — it motivates us a lot!
+
+</div> 

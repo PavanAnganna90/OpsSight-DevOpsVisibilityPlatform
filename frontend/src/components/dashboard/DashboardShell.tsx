@@ -29,66 +29,85 @@ import { Button } from '@/components/ui/button';
 
 interface DashboardShellProps {
   children: React.ReactNode;
+  activeView?: string;
+  onViewChange?: (view: string) => void;
 }
 
 interface NavItem {
   label: string;
-  href: string;
+  href?: string;
+  viewId?: string;
   icon: React.ElementType;
   badge?: string;
   description?: string;
+  isTabNavigation?: boolean;
 }
 
 const navigation: NavItem[] = [
   {
     label: 'Overview',
-    href: '/dashboard',
+    viewId: 'overview',
     icon: LayoutDashboard,
-    description: 'System health and metrics'
+    description: 'System health and metrics',
+    isTabNavigation: true
   },
   {
     label: 'Pipelines',
-    href: '/pipelines',
+    viewId: 'pipelines',
     icon: GitBranch,
     badge: '3',
-    description: 'CI/CD pipeline status'
+    description: 'CI/CD pipeline status',
+    isTabNavigation: true
   },
   {
     label: 'Infrastructure',
-    href: '/infrastructure',
+    viewId: 'infrastructure',
     icon: Server,
-    description: 'Kubernetes & cloud resources'
+    description: 'Kubernetes & cloud resources',
+    isTabNavigation: true
   },
   {
     label: 'Monitoring',
-    href: '/monitoring',
+    viewId: 'monitoring',
     icon: Activity,
-    description: 'Real-time system monitoring'
+    description: 'Real-time system monitoring',
+    isTabNavigation: true
   },
   {
     label: 'Alerts',
-    href: '/alerts',
+    viewId: 'incidents',
     icon: AlertCircle,
     badge: '5',
-    description: 'Incidents and notifications'
+    description: 'Incidents and notifications',
+    isTabNavigation: true
   },
   {
     label: 'Analytics',
-    href: '/analytics',
+    viewId: 'analytics',
     icon: BarChart3,
-    description: 'Performance insights'
+    description: 'Performance insights',
+    isTabNavigation: true
   },
   {
     label: 'Teams',
-    href: '/teams',
+    viewId: 'team',
     icon: Users,
-    description: 'Team collaboration'
+    description: 'Team collaboration',
+    isTabNavigation: true
+  },
+  {
+    label: 'Security',
+    viewId: 'security',
+    icon: Shield,
+    description: 'Security posture',
+    isTabNavigation: true
   },
   {
     label: 'Settings',
     href: '/settings',
     icon: Settings,
-    description: 'Platform configuration'
+    description: 'Platform configuration',
+    isTabNavigation: false
   }
 ];
 
@@ -99,7 +118,7 @@ const quickActions = [
   { label: 'Debug', icon: Code, color: 'text-orange-500' }
 ];
 
-export function DashboardShell({ children }: DashboardShellProps) {
+export function DashboardShell({ children, activeView, onViewChange }: DashboardShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
@@ -162,18 +181,25 @@ export function DashboardShell({ children }: DashboardShellProps) {
         {/* Navigation */}
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
           {navigation.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "group relative flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-200",
-                  "hover:bg-slate-50 dark:hover:bg-slate-800/50",
-                  isActive && "bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50 text-blue-700 dark:text-blue-300 shadow-sm",
-                  !isActive && "text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100"
-                )}
-              >
+            const isActive = item.isTabNavigation 
+              ? activeView === item.viewId 
+              : pathname === item.href;
+            
+            const handleClick = () => {
+              if (item.isTabNavigation && item.viewId && onViewChange) {
+                onViewChange(item.viewId);
+              }
+            };
+
+            const commonClassName = cn(
+              "group relative flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-200",
+              "hover:bg-slate-50 dark:hover:bg-slate-800/50",
+              isActive && "bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50 text-blue-700 dark:text-blue-300 shadow-sm",
+              !isActive && "text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100"
+            );
+
+            const content = (
+              <>
                 <div className="flex items-center space-x-3">
                   <div className={cn(
                     "flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200",
@@ -203,6 +229,24 @@ export function DashboardShell({ children }: DashboardShellProps) {
                 {isActive && (
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-500 to-indigo-500 rounded-r-full"></div>
                 )}
+              </>
+            );
+
+            return item.isTabNavigation ? (
+              <button
+                key={item.viewId}
+                onClick={handleClick}
+                className={commonClassName}
+              >
+                {content}
+              </button>
+            ) : (
+              <Link
+                key={item.href}
+                href={item.href!}
+                className={commonClassName}
+              >
+                {content}
               </Link>
             );
           })}

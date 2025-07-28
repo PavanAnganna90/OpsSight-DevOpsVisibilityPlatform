@@ -356,36 +356,66 @@ class ApiService {
    * Get cache performance metrics
    */
   async getCacheMetrics(): Promise<ApiResponse<CacheMetrics>> {
-    // Use the root cache metrics endpoint
-    const response = await fetch(`${this.baseUrl.replace('/api/v1', '')}/cache/metrics`, {
-      headers: this.getAuthHeaders(),
-    });
-    const data = await response.json();
-    
-    return {
-      success: response.ok,
-      data: response.ok ? data : undefined,
-      error: response.ok ? undefined : data.detail || 'Cache metrics failed',
-      status: response.status,
-    };
+    try {
+      // Use the root cache metrics endpoint with cache control headers to bypass service worker
+      const response = await fetch(`${this.baseUrl.replace('/api/v1', '')}/cache/metrics`, {
+        headers: {
+          ...this.getAuthHeaders(),
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        cache: 'no-store'
+      });
+      const data = await response.json();
+      
+      return {
+        success: response.ok,
+        data: response.ok ? data : undefined,
+        error: response.ok ? undefined : data.detail || 'Cache metrics failed',
+        status: response.status,
+      };
+    } catch (error) {
+      console.error('Cache metrics fetch error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Network error accessing cache metrics',
+        status: 0,
+      };
+    }
   }
 
   /**
    * Get API performance information
    */
   async getApiPerformance(): Promise<ApiResponse<any>> {
-    // Use the root API performance endpoint
-    const response = await fetch(`${this.baseUrl.replace('/api/v1', '')}/api/performance`, {
-      headers: this.getAuthHeaders(),
-    });
-    const data = await response.json();
-    
-    return {
-      success: response.ok,
-      data: response.ok ? data : undefined,
-      error: response.ok ? undefined : data.detail || 'API performance failed',
-      status: response.status,
-    };
+    try {
+      // Use the root API performance endpoint with cache control headers to bypass service worker
+      const response = await fetch(`${this.baseUrl.replace('/api/v1', '')}/api/performance`, {
+        headers: {
+          ...this.getAuthHeaders(),
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        cache: 'no-store'
+      });
+      const data = await response.json();
+      
+      return {
+        success: response.ok,
+        data: response.ok ? data : undefined,
+        error: response.ok ? undefined : data.detail || 'API performance failed',
+        status: response.status,
+      };
+    } catch (error) {
+      console.error('API performance fetch error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Network error accessing API performance',
+        status: 0,
+      };
+    }
   }
 
   /**
