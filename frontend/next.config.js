@@ -23,11 +23,6 @@ const nextConfig = {
     return 'build-' + Date.now();
   },
   
-  // Skip generating 404 page during build
-  generateStaticParams: async () => {
-    return [];
-  },
-  
   // No rewrites
   async rewrites() {
     return [];
