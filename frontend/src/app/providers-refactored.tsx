@@ -48,6 +48,12 @@ const ProviderLoadingFallback = () => (
 );
 
 export function ProvidersWrapper({ children }: ProvidersWrapperProps) {
+  // During static generation, render children directly without providers
+  // This prevents SSR issues with client-only providers
+  if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
+    return <>{children}</>;
+  }
+  
   return (
     <Suspense fallback={<ProviderLoadingFallback />}>
       <QueryProvider>
