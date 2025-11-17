@@ -125,9 +125,6 @@ export default function RootLayout({
             </LoadingBoundary>
           </ProvidersWrapper>
         </ErrorBoundary>
-        
-        {/* Performance monitoring script - moved to external file for security */}
-        <script src="/js/performance-monitor.js" async defer></script>
       </body>
     </html>
   );
