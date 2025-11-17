@@ -1,11 +1,19 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import dynamic from "next/dynamic";
 import "./globals.css";
 import { ProvidersWrapper } from "./providers-refactored";
-import Navigation from "../components/Navigation";
-import CommandPalette from "../components/CommandPalette";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { LoadingBoundary } from "@/components/common/LoadingBoundary";
+
+// Dynamically import client components to prevent SSR issues
+const Navigation = dynamic(() => import("../components/Navigation"), {
+  ssr: false,
+});
+
+const CommandPalette = dynamic(() => import("../components/CommandPalette"), {
+  ssr: false,
+});
 
 // Evidence-based: Inter font provides optimal readability for technical interfaces
 const inter = Inter({ 
@@ -106,8 +114,8 @@ export default function RootLayout({
                   Skip to main content
                 </a>
                 
-                {/* Navigation - only render if not in static generation */}
-                {typeof window !== 'undefined' && <Navigation />}
+                {/* Navigation */}
+                <Navigation />
                 
                 {/* Main content area with semantic HTML */}
                 <main 
@@ -119,8 +127,8 @@ export default function RootLayout({
                   {children}
                 </main>
                 
-                {/* Command palette for power users - only render if not in static generation */}
-                {typeof window !== 'undefined' && <CommandPalette />}
+                {/* Command palette for power users */}
+                <CommandPalette />
               </div>
             </LoadingBoundary>
           </ProvidersWrapper>
