@@ -6,7 +6,7 @@ import { MonitoringProvider } from '@/components/providers/MonitoringProvider';
 import { SecurityProvider } from '@/components/providers/SecurityProvider';
 import { DevAuthProvider } from '@/contexts/DevAuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
-import { ToastProvider } from '@/components/ui/toast';
+import { ToastProvider } from '@/contexts/ToastContext';
 import { ServiceWorkerProvider } from '@/components/providers/ServiceWorkerProvider';
 import { TeamProvider } from '@/contexts/TeamContext';
 import { SettingsProvider } from '@/contexts/SettingsContext';

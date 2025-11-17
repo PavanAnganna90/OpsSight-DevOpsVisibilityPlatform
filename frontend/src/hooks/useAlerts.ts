@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Alert, AlertRule, SilenceRule, Incident } from '@/types/monitoring';
 import { useWebSocket } from './useRealTimeData';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/contexts/ToastContext';
 
 interface AlertsData {
   alerts: Alert[];

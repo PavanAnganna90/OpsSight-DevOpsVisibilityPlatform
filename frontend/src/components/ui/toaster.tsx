@@ -5,7 +5,6 @@ import {
   Toast,
   ToastClose,
   ToastDescription,
-  ToastProvider,
   ToastTitle,
   ToastViewport,
   ToastAction,
@@ -47,7 +46,7 @@ export function Toaster() {
   const { toasts, removeToast } = useToast();
 
   return (
-    <ToastProvider>
+    <>
       {toasts.map((toast) => {
         const { id, title, message, type, action } = toast;
         const variant = getToastVariant(type) as any;
@@ -75,6 +74,6 @@ export function Toaster() {
         );
       })}
       <ToastViewport />
-    </ToastProvider>
+    </>
   );
 }

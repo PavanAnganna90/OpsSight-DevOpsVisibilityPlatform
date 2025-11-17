@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useToast } from '../components/ui/toast';
+import { useToast } from '@/contexts/ToastContext';
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];

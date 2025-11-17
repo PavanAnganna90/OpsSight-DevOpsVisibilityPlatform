@@ -13,7 +13,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/contexts/ToastContext';
 
 export interface TwoFactorMethod {
   id: string;

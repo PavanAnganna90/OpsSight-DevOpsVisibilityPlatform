@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useToast } from '../../../components/ui/toast';
+import { useToast } from '@/contexts/ToastContext';
 import { LoadingOverlay } from '../../../components/ui/LoadingStates';
 
 interface LoginFormData {

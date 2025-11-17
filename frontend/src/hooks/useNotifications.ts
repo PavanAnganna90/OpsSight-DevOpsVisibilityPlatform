@@ -5,7 +5,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/contexts/ToastContext';
 import * as notificationApi from '@/utils/notificationApi';
 import type {
   NotificationRule,

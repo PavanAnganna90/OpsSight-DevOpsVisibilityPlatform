@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, startTransition } from 'react';
 import { WebSocketMessage, metricsWS, notificationsWS } from '../services/websocketService';
-import { useToast } from '../components/ui/toast';
+import { useToast } from '@/contexts/ToastContext';
 
 // Real-time data interfaces
 export interface RealTimeMetrics {

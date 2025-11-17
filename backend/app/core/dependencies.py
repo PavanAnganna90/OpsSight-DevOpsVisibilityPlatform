@@ -24,6 +24,8 @@ from datetime import datetime
 from app.core.config import settings
 from app.core.auth.jwt import verify_token
 from app.core.cache import UniversalCacheManager
+from app.core.database_adapter import DatabaseAdapter
+from app.core.database_factory import get_database_adapter
 from app.repositories.user import UserRepository
 from app.repositories.metrics import MetricsRepository
 from app.services.user_service import UserService
@@ -39,6 +41,7 @@ security = HTTPBearer()
 AsyncSessionDep = Annotated[AsyncSession, Depends(get_async_db)]
 SessionDep = Annotated[Generator, Depends(get_db)]
 SecurityDep = Annotated[HTTPAuthorizationCredentials, Depends(security)]
+DatabaseAdapterDep = Annotated[DatabaseAdapter, Depends(get_database_adapter)]
 
 # Cache manager singleton
 _cache_manager: Optional[UniversalCacheManager] = None
@@ -64,14 +67,14 @@ CacheManagerDep = UniversalCacheManager
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_async_db),
+    adapter: DatabaseAdapterDep = Depends(get_database_adapter),
 ):
     """
     Get the current authenticated user from JWT token.
 
     Args:
         credentials: HTTP Bearer token credentials
-        db: Database session
+        adapter: Database adapter instance
 
     Returns:
         User: The authenticated user object
@@ -98,7 +101,7 @@ async def get_current_user(
             raise credentials_exception
 
         # Look up user in database
-        user_repository = UserRepository(db)
+        user_repository = UserRepository(adapter)
         user = await user_repository.get_by_id(int(user_id))
         
         if user is None:
@@ -125,7 +128,7 @@ async def get_current_user(
 
 async def get_current_user_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
-    db: AsyncSession = Depends(get_async_db),
+    adapter: DatabaseAdapterDep = Depends(get_database_adapter),
 ):
     """
     Get the current authenticated user from JWT token (optional).
@@ -135,7 +138,7 @@ async def get_current_user_optional(
 
     Args:
         credentials: HTTP Bearer token credentials (optional)
-        db: Database session
+        adapter: Database adapter instance
 
     Returns:
         User or None: The authenticated user object or None
@@ -156,7 +159,7 @@ async def get_current_user_optional(
             return None
 
         # Look up user in database
-        user_repository = UserRepository(db)
+        user_repository = UserRepository(adapter)
         user = await user_repository.get_by_id(int(user_id))
         
         if user is None or not user.is_active:
@@ -292,30 +295,34 @@ async def check_dependencies() -> dict:
 # ========================================
 
 
-async def get_user_repository(db: AsyncSessionDep) -> UserRepository:
+async def get_user_repository(
+    adapter: DatabaseAdapterDep = Depends(get_database_adapter)
+) -> UserRepository:
     """
     Factory function for UserRepository.
 
     Args:
-        db: Async database session
+        adapter: Database adapter instance
 
     Returns:
         UserRepository: Configured user repository instance
     """
-    return UserRepository(db)
+    return UserRepository(adapter)
 
 
-async def get_metrics_repository(db: AsyncSessionDep) -> MetricsRepository:
+async def get_metrics_repository(
+    adapter: DatabaseAdapterDep = Depends(get_database_adapter)
+) -> MetricsRepository:
     """
     Factory function for MetricsRepository.
 
     Args:
-        db: Async database session
+        adapter: Database adapter instance
 
     Returns:
         MetricsRepository: Configured metrics repository instance
     """
-    return MetricsRepository(db)
+    return MetricsRepository(adapter)
 
 
 # Type aliases for repository dependencies

@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Modal } from '@/components/ui/Modal';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/contexts/ToastContext';
 
 interface CIFailure {
   id: string;

@@ -24,7 +24,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { useAuth, useRoleAccess } from '@/contexts/DashboardAuthContext';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/contexts/ToastContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';

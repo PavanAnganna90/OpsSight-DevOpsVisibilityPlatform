@@ -26,7 +26,7 @@ import { TextField } from '@/components/ui/TextField';
 import { Select } from '@/components/ui/Select';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { Modal } from '@/components/ui/Modal';
-import { Toast } from '@/components/ui/toast';
+import { Toast } from '@/contexts/ToastContext';
 import { AdminOnly } from '@/components/rbac/PermissionGuard';
 
 interface SSOProviderStatus {

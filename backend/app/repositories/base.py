@@ -1,6 +1,7 @@
 """
 Base repository implementation providing common CRUD operations.
 Implements the repository pattern with SQLAlchemy async support.
+Supports both direct SQLAlchemy sessions and database adapters.
 """
 
 from typing import TypeVar, Generic, Type, Optional, List, Dict, Any, Union
@@ -10,6 +11,7 @@ from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
 
 from app.core.interfaces import BaseRepository as IBaseRepository
+from app.core.database_adapter import DatabaseAdapter
 from app.core.database_monitoring import db_monitor
 
 # Type variables for generic repository
@@ -25,19 +27,23 @@ class BaseRepository(
     Base repository with common CRUD operations.
 
     Generic repository that can be inherited by specific entity repositories.
-    Provides async database operations using SQLAlchemy 2.0+ patterns.
+    Supports both SQLAlchemy sessions and database adapters for dual backend support.
     """
 
-    def __init__(self, db: AsyncSession, model: Type[ModelType]):
+    def __init__(
+        self, db: Union[AsyncSession, DatabaseAdapter], model: Type[ModelType]
+    ):
         """
-        Initialize repository with database session and model.
+        Initialize repository with database session/adapter and model.
 
         Args:
-            db: Async database session
+            db: Async database session or DatabaseAdapter instance
             model: SQLAlchemy model class
         """
         self.db = db
         self.model = model
+        # Determine if we're using an adapter or direct session
+        self._is_adapter = isinstance(db, DatabaseAdapter)
 
     async def get_by_id(
         self, id: Any, options: Optional[List[Any]] = None
@@ -52,6 +58,9 @@ class BaseRepository(
         Returns:
             Entity if found, None otherwise
         """
+        if self._is_adapter:
+            return await self.db.get_by_id(self.model, id, options)
+
         query = select(self.model).where(self.model.id == id)
 
         if options:
@@ -81,6 +90,11 @@ class BaseRepository(
         Returns:
             List of entities
         """
+        if self._is_adapter:
+            return await self.db.get_all(
+                self.model, skip, limit, filters, order_by, options
+            )
+
         query = select(self.model)
 
         # Apply filters
@@ -120,6 +134,9 @@ class BaseRepository(
         Returns:
             Total count of matching entities
         """
+        if self._is_adapter:
+            return await self.db.get_count(self.model, filters)
+
         query = select(func.count(self.model.id))
 
         if filters:
@@ -146,6 +163,9 @@ class BaseRepository(
         # Convert Pydantic model to dict, excluding unset values
         obj_data = obj_in.model_dump(exclude_unset=True)
 
+        if self._is_adapter:
+            return await self.db.create(self.model, obj_data)
+
         # Create model instance
         db_obj = self.model(**obj_data)
 
@@ -169,16 +189,19 @@ class BaseRepository(
         Returns:
             Updated entity if found, None otherwise
         """
-        # Get existing entity
-        db_obj = await self.get_by_id(id)
-        if not db_obj:
-            return None
-
         # Convert update data to dict
         if isinstance(obj_in, BaseModel):
             update_data = obj_in.model_dump(exclude_unset=True)
         else:
             update_data = obj_in
+
+        if self._is_adapter:
+            return await self.db.update(self.model, id, update_data)
+
+        # Get existing entity
+        db_obj = await self.get_by_id(id)
+        if not db_obj:
+            return None
 
         # Update entity attributes
         for field, value in update_data.items():
@@ -201,6 +224,9 @@ class BaseRepository(
         Returns:
             True if entity was deleted, False if not found
         """
+        if self._is_adapter:
+            return await self.db.delete(self.model, id)
+
         # Check if entity exists
         db_obj = await self.get_by_id(id)
         if not db_obj:
@@ -222,12 +248,12 @@ class BaseRepository(
         Returns:
             List of created entities
         """
-        db_objs = []
+        objs_data = [obj_in.model_dump(exclude_unset=True) for obj_in in objs_in]
 
-        for obj_in in objs_in:
-            obj_data = obj_in.model_dump(exclude_unset=True)
-            db_obj = self.model(**obj_data)
-            db_objs.append(db_obj)
+        if self._is_adapter:
+            return await self.db.bulk_create(self.model, objs_data)
+
+        db_objs = [self.model(**obj_data) for obj_data in objs_data]
 
         # Add all objects to session
         self.db.add_all(db_objs)
@@ -272,6 +298,9 @@ class BaseRepository(
         Returns:
             True if entity exists, False otherwise
         """
+        if self._is_adapter:
+            return await self.db.exists(self.model, id)
+
         query = select(func.count(self.model.id)).where(self.model.id == id)
         result = await self.db.execute(query)
         count = result.scalar()
@@ -288,5 +317,19 @@ class BaseRepository(
         Returns:
             Query result
         """
+        if self._is_adapter:
+            # For adapters, execute query directly
+            return await self.db.execute_query(stmt)
+
         async with db_monitor.query_timer(query_name):
             return await self.db.execute(stmt)
+
+    @property
+    def adapter(self) -> Optional[DatabaseAdapter]:
+        """Get database adapter if using adapter pattern."""
+        return self.db if self._is_adapter else None
+
+    @property
+    def session(self) -> Optional[AsyncSession]:
+        """Get SQLAlchemy session if using direct session."""
+        return self.db if not self._is_adapter else None

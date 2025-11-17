@@ -39,6 +39,11 @@ class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
         Returns:
             User if found, None otherwise
         """
+        if self._is_adapter:
+            # Use adapter's get_all with filter
+            results = await self.db.get_all(self.model, skip=0, limit=1, filters={"email": email})
+            return results[0] if results else None
+        
         query = select(User).where(User.email == email)
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
@@ -53,6 +58,11 @@ class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
         Returns:
             User if found, None otherwise
         """
+        if self._is_adapter:
+            # Use adapter's get_all with filter
+            results = await self.db.get_all(self.model, skip=0, limit=1, filters={"github_id": github_id})
+            return results[0] if results else None
+        
         query = select(User).where(User.github_id == github_id)
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
@@ -101,6 +111,17 @@ class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
         Returns:
             List of users with the specified role
         """
+        if self._is_adapter:
+            # Use adapter's get_all with filter
+            # Note: options (selectinload) not supported in adapter mode
+            return await self.db.get_all(
+                self.model,
+                skip=skip,
+                limit=limit,
+                filters={"role_id": role_id},
+                order_by="created_at"
+            )
+        
         query = (
             select(User)
             .where(User.role_id == role_id)
@@ -127,6 +148,25 @@ class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
         Returns:
             List of matching users
         """
+        if self._is_adapter:
+            # For Supabase, we'd need to use text search or filter
+            # This is a simplified version - full text search would require RPC
+            # For now, get all active users and filter in Python (not ideal but works)
+            all_users = await self.db.get_all(
+                self.model,
+                skip=0,
+                limit=1000,  # Get more to filter
+                filters={"is_active": True}
+            )
+            search_lower = search_term.lower()
+            filtered = [
+                u for u in all_users
+                if (u.full_name and search_lower in u.full_name.lower())
+                or (u.email and search_lower in u.email.lower())
+                or (u.github_username and search_lower in u.github_username.lower())
+            ]
+            return filtered[skip:skip + limit]
+        
         search_pattern = f"%{search_term}%"
 
         query = (
@@ -190,24 +230,33 @@ class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
         Returns:
             Dictionary with user counts and statistics
         """
-        from sqlalchemy import func
+        if self._is_adapter:
+            # Use adapter's get_count method
+            total_users = await self.db.get_count(self.model)
+            active_users = await self.db.get_count(self.model, filters={"is_active": True})
+            superusers = await self.db.get_count(
+                self.model, 
+                filters={"is_superuser": True, "is_active": True}
+            )
+        else:
+            from sqlalchemy import func
 
-        # Total users
-        total_query = select(func.count(User.id))
-        total_result = await self.db.execute(total_query)
-        total_users = total_result.scalar()
+            # Total users
+            total_query = select(func.count(User.id))
+            total_result = await self.db.execute(total_query)
+            total_users = total_result.scalar()
 
-        # Active users
-        active_query = select(func.count(User.id)).where(User.is_active == True)
-        active_result = await self.db.execute(active_query)
-        active_users = active_result.scalar()
+            # Active users
+            active_query = select(func.count(User.id)).where(User.is_active == True)
+            active_result = await self.db.execute(active_query)
+            active_users = active_result.scalar()
 
-        # Superusers
-        super_query = select(func.count(User.id)).where(
-            User.is_superuser == True, User.is_active == True
-        )
-        super_result = await self.db.execute(super_query)
-        superusers = super_result.scalar()
+            # Superusers
+            super_query = select(func.count(User.id)).where(
+                User.is_superuser == True, User.is_active == True
+            )
+            super_result = await self.db.execute(super_query)
+            superusers = super_result.scalar()
 
         return {
             "total_users": total_users,

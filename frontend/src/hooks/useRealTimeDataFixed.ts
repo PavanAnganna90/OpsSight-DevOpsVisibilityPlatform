@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef, startTransition, useMemo } from 'react';
 import { WebSocketMessage, metricsWS, notificationsWS } from '../services/websocketServiceRefactored';
-import { useToast } from '../components/ui/toast';
+import { useToast } from '@/contexts/ToastContext';
 
 // Subscription manager for handling multiple component subscriptions
 class SubscriptionManager {

@@ -11,7 +11,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import AlertManagementPage from '../../../pages/AlertManagement';
 import { usePerformanceMonitoring } from '@/hooks/useMonitoring';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/contexts/ToastContext';
 
 // Mock dependencies
 jest.mock('@/hooks/useMonitoring');

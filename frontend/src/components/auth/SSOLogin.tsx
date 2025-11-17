@@ -14,7 +14,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 import { Button } from '@/components/ui/button';
-import { Toast } from '@/components/ui/toast';
+import { Toast } from '@/contexts/ToastContext';
 
 interface SSOProvider {
   name: string;

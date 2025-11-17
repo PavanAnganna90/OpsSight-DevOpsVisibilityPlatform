@@ -112,6 +112,30 @@ class Settings(BaseSettings):
 
     # Database Settings
     DATABASE_URL: PostgresDsn
+    
+    # Database Backend Selection
+    DATABASE_BACKEND: str = Field(
+        default="sqlalchemy",
+        env="DATABASE_BACKEND",
+        description="Database backend to use: 'sqlalchemy' or 'supabase'"
+    )
+    
+    # Supabase Settings (required when DATABASE_BACKEND=supabase)
+    SUPABASE_URL: HttpUrl = Field(
+        default="http://localhost:54321",
+        env="SUPABASE_URL",
+        description="Supabase project URL"
+    )
+    SUPABASE_ANON_KEY: str = Field(
+        default="",
+        env="SUPABASE_ANON_KEY",
+        description="Supabase anonymous key (for client-side operations)"
+    )
+    SUPABASE_SERVICE_ROLE_KEY: str = Field(
+        default="",
+        env="SUPABASE_SERVICE_ROLE_KEY",
+        description="Supabase service role key (for server-side operations, bypasses RLS)"
+    )
 
     # Redis Settings
     REDIS_URL: RedisDsn

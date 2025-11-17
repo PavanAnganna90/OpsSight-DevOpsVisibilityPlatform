@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChatMessage, ChatChannel, OnlineUser, Notification, CollaborationContext } from '@/types/collaboration';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/contexts/ToastContext';
 
 export function useCollaboration() {
   const [channels, setChannels] = useState<ChatChannel[]>([]);
