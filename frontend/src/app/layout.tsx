@@ -106,8 +106,8 @@ export default function RootLayout({
                   Skip to main content
                 </a>
                 
-                {/* Navigation */}
-                <Navigation />
+                {/* Navigation - only render if not in static generation */}
+                {typeof window !== 'undefined' && <Navigation />}
                 
                 {/* Main content area with semantic HTML */}
                 <main 
@@ -119,8 +119,8 @@ export default function RootLayout({
                   {children}
                 </main>
                 
-                {/* Command palette for power users */}
-                <CommandPalette />
+                {/* Command palette for power users - only render if not in static generation */}
+                {typeof window !== 'undefined' && <CommandPalette />}
               </div>
             </LoadingBoundary>
           </ProvidersWrapper>
