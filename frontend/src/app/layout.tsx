@@ -96,7 +96,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
       
-      <body className={`${inter.className} h-full bg-gray-50 dark:bg-gray-900`}>
+      <body className={isStaticGeneration ? 'h-full bg-gray-50 dark:bg-gray-900' : `${inter.className} h-full bg-gray-50 dark:bg-gray-900`}>
         {isStaticGeneration ? (
           // Simplified layout for static generation
           <div className="min-h-screen flex flex-col">
