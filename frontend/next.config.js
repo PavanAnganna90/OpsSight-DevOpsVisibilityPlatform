@@ -18,6 +18,11 @@ const nextConfig = {
   trailingSlash: false,
   skipTrailingSlashRedirect: true,
   
+  // Skip static generation for error pages
+  generateBuildId: async () => {
+    return 'build-' + Date.now();
+  },
+  
   // No rewrites
   async rewrites() {
     return [];
