@@ -28,6 +28,16 @@ const nextConfig = {
     return [];
   },
   
+  // Completely disable static page generation
+  // This forces all pages to be rendered dynamically
+  output: 'standalone',
+  
+  // Skip all static optimization
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '2mb',
+    },
+  },
 }
 
 module.exports = nextConfig;
