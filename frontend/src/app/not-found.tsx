@@ -3,11 +3,8 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 // Simple 404 page - server component
-// Using a function that can't be statically analyzed to prevent static generation
+// Making it async to prevent static generation
 export default async function NotFound() {
-  // This ensures the page is never statically generated
-  'use server';
-  
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
       <div style={{ maxWidth: '28rem', width: '100%', textAlign: 'center', padding: '2rem' }}>
