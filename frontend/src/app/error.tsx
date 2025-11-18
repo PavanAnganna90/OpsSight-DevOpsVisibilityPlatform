@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect } from 'react'
-import Link from 'next/link'
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default function Error({
   error,
@@ -16,33 +18,54 @@ export default function Error({
   }, [error])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-md w-full space-y-8 text-center">
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
+      <div style={{ maxWidth: '28rem', width: '100%', textAlign: 'center', padding: '2rem' }}>
         <div>
-          <h1 className="text-6xl font-bold text-red-600 dark:text-red-400">Error</h1>
-          <h2 className="mt-4 text-2xl font-semibold text-gray-900 dark:text-white">
+          <h1 style={{ fontSize: '3rem', fontWeight: 'bold', color: '#dc2626', margin: 0 }}>Error</h1>
+          <h2 style={{ marginTop: '1rem', fontSize: '1.5rem', fontWeight: '600', color: '#111827' }}>
             Something went wrong!
           </h2>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
+          <p style={{ marginTop: '0.5rem', color: '#4b5563' }}>
             We apologize for the inconvenience. Please try again.
           </p>
         </div>
-        <div className="space-y-3">
+        <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'center' }}>
           <button
             onClick={reset}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:focus:ring-offset-gray-900"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '0.5rem 1rem',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              borderRadius: '0.375rem',
+              color: 'white',
+              backgroundColor: '#dc2626',
+              border: 'none',
+              cursor: 'pointer'
+            }}
           >
             Try again
           </button>
-          <br />
-          <Link
+          <a
             href="/"
-            className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '0.5rem 1rem',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              borderRadius: '0.375rem',
+              color: '#374151',
+              backgroundColor: 'white',
+              border: '1px solid #d1d5db',
+              textDecoration: 'none'
+            }}
           >
             Go back home
-          </Link>
+          </a>
         </div>
       </div>
     </div>
   )
-} 
+}
