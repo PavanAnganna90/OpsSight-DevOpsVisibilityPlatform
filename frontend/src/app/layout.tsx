@@ -1,13 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import dynamic from "next/dynamic";
-
-// Dynamically import the client layout wrapper (client component)
-// This prevents any client component code from being evaluated during static generation
-const ClientLayout = dynamic(() => import("@/components/ClientLayout").then(mod => ({ default: mod.ClientLayout })), {
-  ssr: false,
-});
+import { HydratedLayout } from "@/components/HydratedLayout";
 
 // Evidence-based: Inter font provides optimal readability for technical interfaces
 const inter = Inter({ 
@@ -112,10 +106,22 @@ export default function RootLayout({
             </main>
           </div>
         ) : (
-          // Full layout with all providers for runtime (client-side only)
-          <ClientLayout>
+          // Use HydratedLayout to prevent client components from running during SSR
+          <HydratedLayout
+            fallback={
+              <div className="min-h-screen flex flex-col">
+                <main 
+                  id="main-content"
+                  role="main"
+                  className="flex-1"
+                >
+                  {children}
+                </main>
+              </div>
+            }
+          >
             {children}
-          </ClientLayout>
+          </HydratedLayout>
         )}
       </body>
     </html>
