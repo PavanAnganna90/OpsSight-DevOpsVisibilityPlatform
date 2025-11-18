@@ -1,10 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { ProvidersWrapper } from "./providers-refactored";
-import { ErrorBoundary } from "@/components/common/ErrorBoundary";
-import { LoadingBoundary } from "@/components/common/LoadingBoundary";
-import { ClientOnlyNavigation, ClientOnlyCommandPalette } from "@/components/ClientOnlyComponents";
+import dynamic from "next/dynamic";
+
+// Dynamically import the client layout wrapper (client component)
+// This prevents any client component code from being evaluated during static generation
+const ClientLayout = dynamic(() => import("@/components/ClientLayout").then(mod => ({ default: mod.ClientLayout })), {
+  ssr: false,
+});
 
 // Evidence-based: Inter font provides optimal readability for technical interfaces
 const inter = Inter({ 
