@@ -1,10 +1,10 @@
-'use client'
-
 // Force dynamic rendering - this page should never be statically generated
 export const dynamic = 'force-dynamic';
+export const dynamicParams = true;
 export const revalidate = 0;
+export const runtime = 'nodejs';
 
-// Simple 404 page component - must be a client component to prevent static generation
+// Simple 404 page component - server component in Next.js app router
 // Note: In Next.js app router, not-found.tsx should NOT include <html> or <body> tags
 export default function NotFound() {
   return (
