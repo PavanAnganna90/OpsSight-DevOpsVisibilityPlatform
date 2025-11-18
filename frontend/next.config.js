@@ -28,9 +28,10 @@ const nextConfig = {
     return [];
   },
   
-  // Disable static optimization completely
-  outputFileTracingIncludes: {
-    '/404': [],
+  // Completely disable static page generation
+  // Force all pages to be dynamically rendered
+  generateStaticParams: async () => {
+    return [];
   },
 }
 
