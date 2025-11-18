@@ -1,10 +1,13 @@
-// Prevent static generation by using a dynamic function
+// Prevent static generation - this page must never be statically generated
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// Simple 404 page - must be a server component
-// Next.js will use this when a route is not found
-export default function NotFound() {
+// Simple 404 page - server component
+// Using a function that can't be statically analyzed to prevent static generation
+export default async function NotFound() {
+  // This ensures the page is never statically generated
+  'use server';
+  
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
       <div style={{ maxWidth: '28rem', width: '100%', textAlign: 'center', padding: '2rem' }}>

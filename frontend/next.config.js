@@ -20,7 +20,7 @@ const nextConfig = {
   
   // Skip static generation for error pages
   generateBuildId: async () => {
-    return 'build-' + Date.now();
+    return process.env.BUILD_ID || `build-${Date.now()}`;
   },
   
   // No rewrites
