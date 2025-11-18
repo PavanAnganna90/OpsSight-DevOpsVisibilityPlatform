@@ -1,6 +1,8 @@
-// Next.js 15: not-found.tsx is a special file
-// It must be a Server Component (no 'use client')
-// Next.js handles dynamic rendering automatically for this file
+// Next.js 15 App Router: not-found.tsx is a special file
+// It is ALWAYS statically generated at build time
+// Do NOT use 'use client' or dynamic exports here
+// Keep it simple - only return valid React elements
+// This component gets wrapped in the root layout automatically
 
 export default function NotFound() {
   return (
