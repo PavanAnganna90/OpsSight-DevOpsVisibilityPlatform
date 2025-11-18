@@ -1,10 +1,19 @@
+'use client'
+
+import { useEffect } from 'react'
+
 // Force dynamic rendering - this page should never be statically generated
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// Simple 404 page component - server component in Next.js app router
+// Simple 404 page component - client component to prevent static generation
 // Note: In Next.js app router, not-found.tsx should NOT include <html> or <body> tags
 export default function NotFound() {
+  // This ensures the component only renders on the client, preventing static generation
+  useEffect(() => {
+    // Component is client-side only
+  }, []);
+
   // Return simple JSX without any complex structures
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
