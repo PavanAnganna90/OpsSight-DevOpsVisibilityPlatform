@@ -28,11 +28,6 @@ const nextConfig = {
     return [];
   },
   
-  // Completely disable static page generation
-  // Force all pages to be dynamically rendered
-  generateStaticParams: async () => {
-    return [];
-  },
 }
 
 module.exports = nextConfig;
