@@ -28,9 +28,6 @@ const nextConfig = {
     return [];
   },
   
-  // Enable standalone output for Docker
-  output: 'standalone',
-  
   // Skip all static optimization
   experimental: {
     serverActions: {
