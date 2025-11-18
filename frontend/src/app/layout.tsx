@@ -58,10 +58,6 @@ export default function RootLayout({
 }: { 
   children: React.ReactNode 
 }) {
-  // During static generation (build time), render a simpler layout
-  // This prevents SSR issues with client components
-  const isStaticGeneration = typeof window === 'undefined';
-  
   return (
     <html 
       lang="en" 
