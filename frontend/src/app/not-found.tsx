@@ -1,23 +1,12 @@
-'use client'
-
-import { useEffect, useState } from 'react'
-
-// Force dynamic rendering - this page should never be statically generated
+// Prevent static generation - this page must never be statically generated
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// Simple 404 page component - render only on client to prevent static generation
-export default function NotFound() {
-  const [mounted, setMounted] = useState(false);
-  
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-  
-  // Return null during SSR/static generation to prevent any rendering issues
-  if (!mounted) {
-    return null;
-  }
+// Simple 404 page - async server component to prevent static generation
+export default async function NotFound() {
+  // Force dynamic rendering by making it async
+  // This prevents Next.js from trying to statically generate this page
+  await Promise.resolve();
   
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
