@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { ClientLayoutWrapper } from "@/components/ClientLayoutWrapper";
 
 // Evidence-based: Inter font provides optimal readability for technical interfaces
 const inter = Inter({ 
@@ -94,8 +93,7 @@ export default function RootLayout({
       </head>
       
       <body className={isStaticGeneration ? 'h-full bg-gray-50 dark:bg-gray-900' : `${inter.className} h-full bg-gray-50 dark:bg-gray-900`}>
-        {/* Always render simplified layout during static generation */}
-        {/* Client components will be hydrated via ClientLayoutWrapper at runtime */}
+        {/* Always render simplified layout - no client component imports */}
         <div className="min-h-screen flex flex-col">
           <main 
             id="main-content"
@@ -105,10 +103,26 @@ export default function RootLayout({
             {children}
           </main>
         </div>
-        {/* ClientLayoutWrapper - only renders client components after hydration */}
-        <ClientLayoutWrapper>
-          {children}
-        </ClientLayoutWrapper>
+        {/* Client-side hydration will happen via a separate client component */}
+        {/* This is injected via a script tag that only runs in the browser */}
+        {typeof window !== 'undefined' && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                (function() {
+                  if (typeof window !== 'undefined' && document.readyState === 'complete') {
+                    import('/components/ClientLayoutWrapper').then(module => {
+                      const wrapper = document.createElement('div');
+                      wrapper.id = 'client-layout-wrapper';
+                      document.body.appendChild(wrapper);
+                      // Client-side hydration will happen here
+                    });
+                  }
+                })();
+              `,
+            }}
+          />
+        )}
       </body>
     </html>
   );
