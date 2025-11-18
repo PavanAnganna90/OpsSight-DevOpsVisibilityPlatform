@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { HydratedLayout } from "@/components/HydratedLayout";
+import { ClientLayoutWrapper } from "@/components/ClientLayoutWrapper";
 
 // Evidence-based: Inter font provides optimal readability for technical interfaces
 const inter = Inter({ 
@@ -94,35 +94,21 @@ export default function RootLayout({
       </head>
       
       <body className={isStaticGeneration ? 'h-full bg-gray-50 dark:bg-gray-900' : `${inter.className} h-full bg-gray-50 dark:bg-gray-900`}>
-        {isStaticGeneration ? (
-          // Simplified layout for static generation - no client components
-          <div className="min-h-screen flex flex-col">
-            <main 
-              id="main-content"
-              role="main"
-              className="flex-1"
-            >
-              {children}
-            </main>
-          </div>
-        ) : (
-          // Use HydratedLayout to prevent client components from running during SSR
-          <HydratedLayout
-            fallback={
-              <div className="min-h-screen flex flex-col">
-                <main 
-                  id="main-content"
-                  role="main"
-                  className="flex-1"
-                >
-                  {children}
-                </main>
-              </div>
-            }
+        {/* Always render simplified layout during static generation */}
+        {/* Client components will be hydrated via ClientLayoutWrapper at runtime */}
+        <div className="min-h-screen flex flex-col">
+          <main 
+            id="main-content"
+            role="main"
+            className="flex-1"
           >
             {children}
-          </HydratedLayout>
-        )}
+          </main>
+        </div>
+        {/* ClientLayoutWrapper - only renders client components after hydration */}
+        <ClientLayoutWrapper>
+          {children}
+        </ClientLayoutWrapper>
       </body>
     </html>
   );
