@@ -38,12 +38,6 @@ const nextConfig = {
       bodySizeLimit: '2mb',
     },
   },
-  
-  // Prevent static generation of error pages
-  // This tells Next.js to not try to generate static 404/500 pages
-  generateStaticParams: async () => {
-    return [];
-  },
 }
 
 module.exports = nextConfig;
