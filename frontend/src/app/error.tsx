@@ -2,8 +2,8 @@
 
 import { useEffect } from 'react'
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// Remove dynamic/revalidate exports - error.tsx is a special file
+// Next.js handles error pages automatically
 
 export default function Error({
   error,
