@@ -27,6 +27,11 @@ const nextConfig = {
   async rewrites() {
     return [];
   },
+  
+  // Disable static optimization for 404 page
+  experimental: {
+    missingSuspenseWithCSRBailout: false,
+  },
 }
 
 module.exports = nextConfig;
