@@ -1,13 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
-
-// Evidence-based: Inter font provides optimal readability for technical interfaces
-const inter = Inter({ 
-  subsets: ["latin"],
-  display: 'swap', // Performance: Better loading experience
-  preload: true
-});
 
 export const metadata: Metadata = {
   title: "OpsSight - DevOps Visibility Platform",
