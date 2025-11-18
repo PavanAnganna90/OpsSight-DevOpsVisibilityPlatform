@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
-// Temporarily disable globals.css import to test if it's causing the issue
-// import "./globals.css";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "OpsSight - DevOps Visibility Platform",

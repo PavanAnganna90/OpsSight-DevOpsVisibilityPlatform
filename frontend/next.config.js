@@ -27,6 +27,11 @@ const nextConfig = {
   async rewrites() {
     return [];
   },
+  
+  // Disable static optimization completely
+  outputFileTracingIncludes: {
+    '/404': [],
+  },
 }
 
 module.exports = nextConfig;
