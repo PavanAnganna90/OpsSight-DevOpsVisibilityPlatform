@@ -6,7 +6,8 @@
  */
 
 // Re-export from new modular services
-export { WebSocketMessage, WebSocketService } from './websocket/WebSocketService';
+export type { WebSocketMessage } from './websocket/WebSocketService';
+export { WebSocketService } from './websocket/WebSocketService';
 export { ConnectionManager } from './websocket/ConnectionManager';
 export { MessageQueue } from './websocket/MessageQueue';
 export { HeartbeatManager } from './websocket/HeartbeatManager';
