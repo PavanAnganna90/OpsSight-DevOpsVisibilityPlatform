@@ -86,33 +86,39 @@ elif [ -d "$OXIDE_PKG_LOCAL" ]; then
 fi
 
 # Ensure native package is accessible to @tailwindcss/oxide
-# The native binding should be in lib/ directory of the platform package
+# The native binding is in the root of the platform package
 if [ -n "$OXIDE_PKG_PATH" ] && [ -n "$OXIDE_DIR" ]; then
   echo "📋 Ensuring @tailwindcss/oxide can access native binding..."
   
-  # Check for binary in the native package
-  if [ -f "$OXIDE_PKG_PATH/lib/oxide.linux-x64-gnu.node" ]; then
-    echo "📋 Found native binary in $OXIDE_PKG_PATH/lib/"
+  # Check for binary in the native package (it's named tailwindcss-oxide.linux-x64-gnu.node)
+  BINARY_NAME="tailwindcss-oxide.linux-x64-gnu.node"
+  SOURCE_BINARY="$OXIDE_PKG_PATH/$BINARY_NAME"
+  
+  if [ -f "$SOURCE_BINARY" ]; then
+    echo "📋 Found native binary at $SOURCE_BINARY"
     
     # Ensure oxide package can access it - try creating symlink or copying
-    mkdir -p "$OXIDE_DIR/lib"
+    # We copy to both possible names to be safe
     
-    # Try symlink first (preserves package structure)
-    if [ ! -f "$OXIDE_DIR/lib/oxide.linux-x64-gnu.node" ]; then
-      ln -sf "$(pwd)/$OXIDE_PKG_PATH/lib/oxide.linux-x64-gnu.node" "$OXIDE_DIR/lib/oxide.linux-x64-gnu.node" 2>/dev/null || \
-      cp -f "$OXIDE_PKG_PATH/lib/oxide.linux-x64-gnu.node" "$OXIDE_DIR/lib/oxide.linux-x64-gnu.node"
-    fi
+    # 1. Copy with original name to root of oxide package
+    cp -f "$SOURCE_BINARY" "$OXIDE_DIR/$BINARY_NAME"
     
-    # Also try root of oxide package (some versions may look there)
-    if [ ! -f "$OXIDE_DIR/oxide.linux-x64-gnu.node" ]; then
-      cp -f "$OXIDE_PKG_PATH/lib/oxide.linux-x64-gnu.node" "$OXIDE_DIR/oxide.linux-x64-gnu.node" || true
-    fi
+    # 2. Copy with 'oxide' prefix name (just in case)
+    cp -f "$SOURCE_BINARY" "$OXIDE_DIR/oxide.linux-x64-gnu.node" || true
     
     echo "✅ @tailwindcss/oxide native binding linked/copied successfully"
   else
-    echo "⚠️  Warning: Native binary not found at $OXIDE_PKG_PATH/lib/oxide.linux-x64-gnu.node"
+    echo "⚠️  Warning: Native binary not found at $SOURCE_BINARY"
     echo "   Package structure:"
     ls -la "$OXIDE_PKG_PATH" 2>/dev/null || echo "   (cannot list package directory)"
+    
+    # Fallback: Try searching for any .node file
+    FOUND_BINARY=$(find "$OXIDE_PKG_PATH" -name "*.node" | head -n 1)
+    if [ -n "$FOUND_BINARY" ]; then
+        echo "📋 Found alternative binary: $FOUND_BINARY"
+        cp -f "$FOUND_BINARY" "$OXIDE_DIR/$(basename "$FOUND_BINARY")"
+        echo "✅ Copied alternative binary"
+    fi
   fi
 else
   echo "⚠️  Warning: Could not locate @tailwindcss/oxide packages"
