@@ -38,42 +38,25 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 5, // Accessibility: Allow zoom for users who need it
-  userScalable: true, // Accessibility: WCAG 2.1 requirement
+  maximumScale: 5,
+  userScalable: true,
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
     { media: "(prefers-color-scheme: dark)", color: "#0f172a" }
   ],
 };
 
-/**
- * Root Layout Component
- * Architecture: Follows SuperClaude evidence-based provider pattern
- * Security: CSP headers, CSRF protection, XSS prevention
- * Performance: Optimized loading sequence, code splitting
- * Accessibility: WCAG 2.1 AA compliant structure
- */
 export default function RootLayout({ 
   children 
 }: { 
   children: React.ReactNode 
 }) {
   return (
-    <html 
-      lang="en" 
-      className="h-full" 
-      suppressHydrationWarning
-    >
+    <html lang="en" className="h-full" suppressHydrationWarning>
       <head>
-        {/* Security: CSP and security headers */}
         <meta name="color-scheme" content="light dark" />
-        {/* CSRF token is now handled securely via API endpoint and httpOnly cookies */}
-        
-        {/* Performance: Preconnect to critical domains */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        
-        {/* PWA Configuration */}
         <link rel="icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -81,8 +64,6 @@ export default function RootLayout({
       </head>
       
       <body className="h-full bg-gray-50 dark:bg-gray-900">
-        {/* Always render simplified layout - no client component imports */}
-        {/* This ensures zero client component evaluation during static generation */}
         <div className="min-h-screen flex flex-col">
           <main 
             id="main-content"
