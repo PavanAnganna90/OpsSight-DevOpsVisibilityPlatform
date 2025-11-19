@@ -3,6 +3,9 @@
 import React from 'react';
 import { DevBypassComponent } from '@/components/auth/DevBypass';
 
+// Force dynamic rendering to avoid static generation errors with useToast
+export const dynamic = 'force-dynamic';
+
 export default function DevAuthPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
