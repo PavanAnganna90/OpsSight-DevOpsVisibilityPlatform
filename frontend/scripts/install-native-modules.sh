@@ -57,9 +57,73 @@ mkdir -p "$LIGHTNINGCSS_DIR"
 cp -f "$BINARY_SOURCE" "$LIGHTNINGCSS_DIR/lightningcss.linux-x64-gnu.node"
 echo "✅ Binary copied successfully to $LIGHTNINGCSS_DIR/"
 
-# Rebuild lightningcss to ensure correct linking
-echo "🔨 Rebuilding lightningcss..."
-npm rebuild lightningcss || echo "⚠️  Rebuild warning (may be OK)"
+# Handle @tailwindcss/oxide native binding
+# @tailwindcss/oxide uses @tailwindcss/oxide-linux-x64-gnu as optional dependency
+# The native package should be automatically linked, but we ensure it's accessible
+OXIDE_PKG_ROOT="../node_modules/@tailwindcss/oxide-linux-x64-gnu"
+OXIDE_PKG_LOCAL="node_modules/@tailwindcss/oxide-linux-x64-gnu"
+OXIDE_DIR_ROOT="../node_modules/@tailwindcss/oxide"
+OXIDE_DIR_LOCAL="node_modules/@tailwindcss/oxide"
+
+# Find where the oxide native package was installed
+OXIDE_PKG_PATH=""
+OXIDE_DIR=""
+
+if [ -d "$OXIDE_PKG_ROOT" ] && [ -d "$OXIDE_DIR_ROOT" ]; then
+  echo "📋 Found @tailwindcss/oxide packages in root (workspace hoisted)"
+  OXIDE_PKG_PATH="$OXIDE_PKG_ROOT"
+  OXIDE_DIR="$OXIDE_DIR_ROOT"
+elif [ -d "$OXIDE_PKG_LOCAL" ]; then
+  echo "📋 Found @tailwindcss/oxide-linux-x64-gnu in local node_modules"
+  OXIDE_PKG_PATH="$OXIDE_PKG_LOCAL"
+  if [ -d "$OXIDE_DIR_ROOT" ]; then
+    echo "📋 @tailwindcss/oxide is in root node_modules (hoisted)"
+    OXIDE_DIR="$OXIDE_DIR_ROOT"
+  else
+    echo "📋 @tailwindcss/oxide is in local node_modules"
+    OXIDE_DIR="$OXIDE_DIR_LOCAL"
+  fi
+fi
+
+# Ensure native package is accessible to @tailwindcss/oxide
+# The native binding should be in lib/ directory of the platform package
+if [ -n "$OXIDE_PKG_PATH" ] && [ -n "$OXIDE_DIR" ]; then
+  echo "📋 Ensuring @tailwindcss/oxide can access native binding..."
+  
+  # Check for binary in the native package
+  if [ -f "$OXIDE_PKG_PATH/lib/oxide.linux-x64-gnu.node" ]; then
+    echo "📋 Found native binary in $OXIDE_PKG_PATH/lib/"
+    
+    # Ensure oxide package can access it - try creating symlink or copying
+    mkdir -p "$OXIDE_DIR/lib"
+    
+    # Try symlink first (preserves package structure)
+    if [ ! -f "$OXIDE_DIR/lib/oxide.linux-x64-gnu.node" ]; then
+      ln -sf "$(pwd)/$OXIDE_PKG_PATH/lib/oxide.linux-x64-gnu.node" "$OXIDE_DIR/lib/oxide.linux-x64-gnu.node" 2>/dev/null || \
+      cp -f "$OXIDE_PKG_PATH/lib/oxide.linux-x64-gnu.node" "$OXIDE_DIR/lib/oxide.linux-x64-gnu.node"
+    fi
+    
+    # Also try root of oxide package (some versions may look there)
+    if [ ! -f "$OXIDE_DIR/oxide.linux-x64-gnu.node" ]; then
+      cp -f "$OXIDE_PKG_PATH/lib/oxide.linux-x64-gnu.node" "$OXIDE_DIR/oxide.linux-x64-gnu.node" || true
+    fi
+    
+    echo "✅ @tailwindcss/oxide native binding linked/copied successfully"
+  else
+    echo "⚠️  Warning: Native binary not found at $OXIDE_PKG_PATH/lib/oxide.linux-x64-gnu.node"
+    echo "   Package structure:"
+    ls -la "$OXIDE_PKG_PATH" 2>/dev/null || echo "   (cannot list package directory)"
+  fi
+else
+  echo "⚠️  Warning: Could not locate @tailwindcss/oxide packages"
+  echo "   Tried: $OXIDE_PKG_ROOT"
+  echo "   Tried: $OXIDE_PKG_LOCAL"
+fi
+
+# Rebuild both packages to ensure correct linking
+echo "🔨 Rebuilding native modules..."
+npm rebuild lightningcss || echo "⚠️  lightningcss rebuild warning (may be OK)"
+npm rebuild @tailwindcss/oxide || echo "⚠️  @tailwindcss/oxide rebuild warning (may be OK)"
 
 echo "✅ Native modules installation complete"
 
