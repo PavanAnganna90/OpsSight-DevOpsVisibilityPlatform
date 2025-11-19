@@ -2,7 +2,6 @@
 
 // Prevent static generation - this page requires client-side context (ToastProvider)
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';

@@ -1,7 +1,6 @@
 // Next.js 15 App Router: 500.tsx is a special file for server errors
 // Workaround: Force dynamic rendering to prevent static generation errors
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 export default function Custom500() {
   return (

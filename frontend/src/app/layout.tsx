@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "OpsSight - DevOps Visibility Platform",
@@ -64,15 +65,17 @@ export default function RootLayout({
       </head>
       
       <body className="h-full bg-gray-50 dark:bg-gray-900">
-        <div className="min-h-screen flex flex-col">
-          <main 
-            id="main-content"
-            role="main"
-            className="flex-1"
-          >
-            {children}
-          </main>
-        </div>
+        <Providers>
+          <div className="min-h-screen flex flex-col">
+            <main 
+              id="main-content"
+              role="main"
+              className="flex-1"
+            >
+              {children}
+            </main>
+          </div>
+        </Providers>
       </body>
     </html>
   );
